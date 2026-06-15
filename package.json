@@ -1,0 +1,40 @@
+{
+	"name": "@vdegenne/highlight-manager",
+	"version": "0.1.1",
+	"description": "helper to navigate/highlight elements in a page based on a css selector",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./lib/index.js",
+			"types": "./lib/index.d.ts"
+		}
+	},
+	"files": [
+		"lib/**",
+		"!lib/**/*.js.map",
+		"!lib/**/*.d.ts.map"
+	],
+	"scripts": {
+		"build": "wireit"
+	},
+	"wireit": {
+		"build": {
+			"command": "tsc --pretty",
+			"clean": "if-file-deleted",
+			"files": [
+				"./tsconfig.json",
+				"./src"
+			],
+			"output": [
+				"./lib"
+			]
+		}
+	},
+	"devDependencies": {
+		"typescript": "^6.0.3",
+		"wireit": "^0.14.12"
+	},
+	"dependencies": {
+		"html-vision": "^0.3.10"
+	}
+}
