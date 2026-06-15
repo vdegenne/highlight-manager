@@ -1,11 +1,6 @@
 import {querySelectorAll} from 'html-vision'
 import {isInViewport, sleep} from './utils.js'
 
-// const query = document.querySelector;
-// const queryAll = document.querySelectorAll
-// const querySelector = _querySelector;
-// const querySelectorAll = _querySelectorAll;
-
 interface Info {
 	elements: HTMLElement[]
 	// /**
