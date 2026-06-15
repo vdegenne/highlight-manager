@@ -186,14 +186,21 @@ export class HighLightManager {
 		// 	el.hasAttribute('highlight'),
 		// );
 
-		if (!highlightElements || highlightElements.length === 0) {
-			throw Error("The highlighted element couldn't be found")
-		}
+		// if (!highlightElements || highlightElements.length === 0) {
+		// 	console.warn("The highlighted element couldn't be found")
+		// 	return {
+		// 		highlightIndexStart: -1,
+		// 		highlightIndexEnd: -1,
+		// 		elements: []
+		// 	}
+		// }
 
-		const highlightIndexStart = elements.indexOf(highlightElements[0]!)
-		const highlightIndexEnd = elements.indexOf(
-			highlightElements[highlightElements.length - 1]!,
-		)
+		const highlightIndexStart = highlightElements.length
+			? elements.indexOf(highlightElements[0]!)
+			: -1
+		const highlightIndexEnd = highlightElements.length
+			? elements.indexOf(highlightElements[highlightElements.length - 1]!)
+			: -1
 		if (highlightElements.length === 1) {
 			// const highlightElement = elements[highlightIndex];
 		}
