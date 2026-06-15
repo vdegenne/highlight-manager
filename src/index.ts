@@ -71,6 +71,11 @@ const defaults: Options = {
 // Local array of all declared highlighters for id control.
 const highlighters: HighLightManager[] = []
 
+let globalBeforeHighlight: (() => void) | undefined
+export function setGlobalBeforeHighlight(fct: () => void) {
+	globalBeforeHighlight = fct
+}
+
 export class HighLightManager {
 	#cache: Info = {
 		elements: [],
@@ -264,6 +269,7 @@ export class HighLightManager {
 		}
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
+		globalBeforeHighlight?.()
 		this.#options.beforeHighlight?.()
 		// playClick()
 
