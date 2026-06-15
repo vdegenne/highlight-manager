@@ -283,7 +283,7 @@ export class HighLightManager {
 		}
 
 		if (
-			this.#options.scrollWhenOffscreen ||
+			this.#options.scrollWhenOffscreen &&
 			!isInViewport(elementsToHighlight[0]!)
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
