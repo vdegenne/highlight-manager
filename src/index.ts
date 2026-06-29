@@ -49,6 +49,13 @@ interface Options {
 	 * @default false
 	 */
 	scrollWhenOffscreen: boolean
+
+	/**
+	 * If true, will select the next visible candidate if the highlight is offscreen.
+	 *
+	 * @default false
+	 */
+	fastTravel: boolean
 }
 
 const defaults: Options = {
@@ -66,6 +73,7 @@ const defaults: Options = {
 	onSelectionChange: undefined,
 	applyStyleSheetTo: document,
 	scrollWhenOffscreen: false,
+	fastTravel: false,
 }
 
 // Local array of all declared highlighters for id control.
@@ -315,14 +323,44 @@ export class HighLightManager {
 			return
 		}
 
-		let previousIndex =
+		const currIndex =
 			highlightIndexStart !== highlightIndexEnd
 				? highlightIndexStart
-				: this.#options.loop
-					? (highlightIndexStart - step + len) % len
-					: Math.max(0, highlightIndexStart - step)
+				: highlightIndexStart
 
-		this.highlight(previousIndex, previousIndex, true, cache)
+		const currEl = elements[currIndex]
+		const currIsVisible = currEl ? isInViewport(currEl) : false
+
+		const currIsBelow = currEl
+			? currEl.getBoundingClientRect().top > window.innerHeight
+			: false
+
+		let prevIndex = -1
+
+		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
+			for (let i = currIndex - 1; i >= 0; i--) {
+				const el = elements[i]
+				if (el && isInViewport(el)) {
+					prevIndex = i
+					break
+				}
+			}
+		}
+
+		if (prevIndex === -1) {
+			const base =
+				highlightIndexStart !== highlightIndexEnd
+					? highlightIndexStart
+					: highlightIndexStart
+
+			if (this.#options.loop) {
+				prevIndex = (base - step + len) % len
+			} else {
+				prevIndex = Math.max(0, base - step)
+			}
+		}
+
+		this.highlight(prevIndex, prevIndex, true, cache)
 	}
 
 	next(step = 1, cache = false) {
@@ -335,12 +373,42 @@ export class HighLightManager {
 			return
 		}
 
-		let nextIndex =
+		const currIndex =
 			highlightIndexStart !== highlightIndexEnd
 				? highlightIndexEnd
-				: this.#options.loop
-					? (highlightIndexEnd + step) % len
-					: Math.min(len - 1, highlightIndexEnd + step)
+				: highlightIndexEnd
+
+		const currEl = elements[currIndex]
+		const currIsVisible = currEl ? isInViewport(currEl) : false
+
+		const currIsAbove = currEl
+			? currEl.getBoundingClientRect().bottom < 0
+			: false
+
+		let nextIndex = -1
+
+		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
+			for (let i = currIndex + 1; i < len; i++) {
+				const el = elements[i]
+				if (el && isInViewport(el)) {
+					nextIndex = i
+					break
+				}
+			}
+		}
+
+		if (nextIndex === -1) {
+			const base =
+				highlightIndexStart !== highlightIndexEnd
+					? highlightIndexEnd
+					: highlightIndexEnd
+
+			if (this.#options.loop) {
+				nextIndex = (base + step) % len
+			} else {
+				nextIndex = Math.min(len - 1, base + step)
+			}
+		}
 
 		this.highlight(nextIndex, nextIndex, true, cache)
 	}
