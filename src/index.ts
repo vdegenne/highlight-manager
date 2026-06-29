@@ -328,6 +328,21 @@ export class HighLightManager {
 				? highlightIndexStart
 				: highlightIndexStart
 
+		if (currIndex === -1) {
+			if (this.#options.fastTravel) {
+				const found = [...elements].reverse().find((el) => isInViewport(el))
+
+				if (found) {
+					const i = elements.indexOf(found)
+					this.highlight(i, i, true, cache)
+					return
+				}
+			}
+
+			this.highlight(len - 1, len - 1, true, cache)
+			return
+		}
+
 		const currEl = elements[currIndex]
 		const currIsVisible = currEl ? isInViewport(currEl) : false
 
@@ -338,26 +353,20 @@ export class HighLightManager {
 		let prevIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
-			for (let i = currIndex - 1; i >= 0; i--) {
-				const el = elements[i]
-				if (el && isInViewport(el)) {
-					prevIndex = i
-					break
-				}
+			const found = elements
+				.slice(0, currIndex)
+				.reverse()
+				.find((el) => isInViewport(el))
+
+			if (found) {
+				prevIndex = elements.indexOf(found)
 			}
 		}
 
 		if (prevIndex === -1) {
-			const base =
-				highlightIndexStart !== highlightIndexEnd
-					? highlightIndexStart
-					: highlightIndexStart
-
-			if (this.#options.loop) {
-				prevIndex = (base - step + len) % len
-			} else {
-				prevIndex = Math.max(0, base - step)
-			}
+			prevIndex = this.#options.loop
+				? (currIndex - step + len) % len
+				: Math.max(0, currIndex - step)
 		}
 
 		this.highlight(prevIndex, prevIndex, true, cache)
@@ -378,6 +387,20 @@ export class HighLightManager {
 				? highlightIndexEnd
 				: highlightIndexEnd
 
+		if (currIndex === -1) {
+			if (this.#options.fastTravel) {
+				const found = elements.find((el) => isInViewport(el))
+				if (found) {
+					const i = elements.indexOf(found)
+					this.highlight(i, i, true, cache)
+					return
+				}
+			}
+
+			this.highlight(0, 0, true, cache)
+			return
+		}
+
 		const currEl = elements[currIndex]
 		const currIsVisible = currEl ? isInViewport(currEl) : false
 
@@ -388,26 +411,17 @@ export class HighLightManager {
 		let nextIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
-			for (let i = currIndex + 1; i < len; i++) {
-				const el = elements[i]
-				if (el && isInViewport(el)) {
-					nextIndex = i
-					break
-				}
+			const found = elements.slice(currIndex + 1).find((el) => isInViewport(el))
+
+			if (found) {
+				nextIndex = elements.indexOf(found)
 			}
 		}
 
 		if (nextIndex === -1) {
-			const base =
-				highlightIndexStart !== highlightIndexEnd
-					? highlightIndexEnd
-					: highlightIndexEnd
-
-			if (this.#options.loop) {
-				nextIndex = (base + step) % len
-			} else {
-				nextIndex = Math.min(len - 1, base + step)
-			}
+			nextIndex = this.#options.loop
+				? (currIndex + step) % len
+				: Math.min(len - 1, currIndex + step)
 		}
 
 		this.highlight(nextIndex, nextIndex, true, cache)
