@@ -9,10 +9,14 @@ export function sleep(milli: number = 1000) {
 // 	)
 // }
 
-export function isInViewport(el: HTMLElement): boolean {
+export function isInViewport(el: HTMLElement, onlyTop = false): boolean {
 	const rect = el.getBoundingClientRect()
 	const viewHeight = window.innerHeight || document.documentElement.clientHeight
 	const viewWidth = window.innerWidth || document.documentElement.clientWidth
+
+	if (onlyTop) {
+		return rect.top >= 0 && rect.top <= viewHeight
+	}
 
 	return (
 		rect.bottom > 0 &&

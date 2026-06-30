@@ -20,6 +20,8 @@ interface Info {
 	highlightContent: string | undefined
 }
 
+type ScrollWhenOffscreenOption = 'never' | 'bounding-rect' | 'top'
+
 interface Options {
 	css: string
 	highlightTextColor: string
@@ -46,9 +48,9 @@ interface Options {
 	applyStyleSheetTo: Document | HTMLElement | ShadowRoot
 
 	/**
-	 * @default false
+	 * @default 'none'
 	 */
-	scrollWhenOffscreen: boolean
+	scrollWhenOffscreen: ScrollWhenOffscreenOption
 
 	/**
 	 * If true, will select the next visible candidate if the highlight is offscreen.
@@ -72,7 +74,7 @@ const defaults: Options = {
 	beforeHighlight: undefined,
 	onSelectionChange: undefined,
 	applyStyleSheetTo: document,
-	scrollWhenOffscreen: false,
+	scrollWhenOffscreen: 'never',
 	fastTravel: false,
 }
 
@@ -82,6 +84,10 @@ const highlighters: HighLightManager[] = []
 let globalBeforeHighlight: (() => void) | undefined
 export function setGlobalBeforeHighlight(fct: () => void) {
 	globalBeforeHighlight = fct
+}
+
+interface HighlightOptions {
+	scrollWhenOffscreen: ScrollWhenOffscreenOption
 }
 
 export class HighLightManager {
@@ -159,7 +165,9 @@ export class HighLightManager {
 				const el = els[index]
 
 				if (el) {
-					this.highlight(index, index, true, false)
+					this.highlight(index, index, true, false, {
+						scrollWhenOffscreen: 'never',
+					})
 					wr.resolve(el)
 					this.#highlightWhenAvailablePromiseWR = undefined
 					return
@@ -256,6 +264,7 @@ export class HighLightManager {
 		end?: number,
 		unhighlightAll = true,
 		cache = false,
+		options?: HighlightOptions,
 	): boolean {
 		if (end === undefined) {
 			end = start
@@ -277,6 +286,11 @@ export class HighLightManager {
 		}
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
+		const _options: HighlightOptions = {
+			scrollWhenOffscreen:
+				options?.scrollWhenOffscreen ?? this.#options.scrollWhenOffscreen,
+		}
+
 		globalBeforeHighlight?.()
 		this.#options.beforeHighlight?.()
 		// playClick()
@@ -291,13 +305,16 @@ export class HighLightManager {
 		}
 
 		if (
-			this.#options.scrollWhenOffscreen &&
-			!isInViewport(elementsToHighlight[0]!)
+			_options.scrollWhenOffscreen !== 'never' &&
+			!isInViewport(
+				elementsToHighlight[0]!,
+				_options.scrollWhenOffscreen === 'top',
+			)
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
 				behavior: 'smooth',
-				block: 'center',
-				inline: 'center',
+				block: _options.scrollWhenOffscreen === 'top' ? 'start' : 'center',
+				inline: _options.scrollWhenOffscreen === 'top' ? 'start' : 'center',
 			})
 		}
 
