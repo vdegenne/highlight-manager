@@ -318,15 +318,16 @@ export class HighLightManager {
 		}
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
+		const baseScrollStrategy =
+			options?.scrollStrategy ?? this.#options.scrollStrategy
+
 		const _options: HighlightOptions = {
-			scrollStrategy:
-				options?.scrollStrategy || this.#options.scrollStrategy
-					? {
-							...scrollStrategyDefaults,
-							...this.#options.scrollStrategy,
-							...options?.scrollStrategy,
-						}
-					: undefined,
+			scrollStrategy: baseScrollStrategy
+				? {
+						...scrollStrategyDefaults,
+						...baseScrollStrategy,
+					}
+				: undefined,
 		}
 
 		globalBeforeHighlight?.()
