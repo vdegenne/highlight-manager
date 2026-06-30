@@ -1,5 +1,5 @@
 import {querySelectorAll} from 'html-vision'
-import {isInViewport, sleep} from './utils.js'
+import {isInViewport, IsInViewportPartCheck, sleep} from './utils.js'
 
 interface Info {
 	elements: HTMLElement[]
@@ -20,7 +20,25 @@ interface Info {
 	highlightContent: string | undefined
 }
 
-type ScrollWhenOffscreenOption = 'never' | 'bounding-rect' | 'top'
+interface ScrollStrategy {
+	/**
+	 * @default 'center'
+	 */
+	whenWhatPartIsHidden: IsInViewportPartCheck
+	/**
+	 * @default 'smooth'
+	 */
+	behavior: ScrollBehavior
+	/**
+	 * @default 'start'
+	 */
+	logicalPosition: ScrollLogicalPosition
+}
+const scrollStrategyDefaults: ScrollStrategy = {
+	whenWhatPartIsHidden: 'center',
+	behavior: 'smooth',
+	logicalPosition: 'start',
+}
 
 interface Options {
 	css: string
@@ -48,9 +66,9 @@ interface Options {
 	applyStyleSheetTo: Document | HTMLElement | ShadowRoot
 
 	/**
-	 * @default 'none'
+	 * @default undefined
 	 */
-	scrollWhenOffscreen: ScrollWhenOffscreenOption
+	scrollStrategy: ScrollStrategy | undefined
 
 	/**
 	 * If true, will select the next visible candidate if the highlight is offscreen.
@@ -74,7 +92,7 @@ const defaults: Options = {
 	beforeHighlight: undefined,
 	onSelectionChange: undefined,
 	applyStyleSheetTo: document,
-	scrollWhenOffscreen: 'never',
+	scrollStrategy: undefined,
 	fastTravel: false,
 }
 
@@ -87,7 +105,7 @@ export function setGlobalBeforeHighlight(fct: () => void) {
 }
 
 interface HighlightOptions {
-	scrollWhenOffscreen: ScrollWhenOffscreenOption
+	scrollStrategy: ScrollStrategy | undefined
 }
 
 export class HighLightManager {
@@ -165,9 +183,16 @@ export class HighLightManager {
 				const el = els[index]
 
 				if (el) {
-					this.highlight(index, index, true, false, {
-						scrollWhenOffscreen: 'never',
-					})
+					this.highlight(
+						index,
+						index,
+						true,
+						false,
+						// TODO: This should be uncommented?
+						// {
+						// 	scrollStrategy: undefined, // Disable scrolling on first highlight
+						// },
+					)
 					wr.resolve(el)
 					this.#highlightWhenAvailablePromiseWR = undefined
 					return
@@ -287,8 +312,11 @@ export class HighLightManager {
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
 		const _options: HighlightOptions = {
-			scrollWhenOffscreen:
-				options?.scrollWhenOffscreen ?? this.#options.scrollWhenOffscreen,
+			scrollStrategy: {
+				...scrollStrategyDefaults,
+				...this.#options.scrollStrategy,
+				...options?.scrollStrategy,
+			},
 		}
 
 		globalBeforeHighlight?.()
@@ -305,16 +333,16 @@ export class HighLightManager {
 		}
 
 		if (
-			_options.scrollWhenOffscreen !== 'never' &&
+			_options.scrollStrategy &&
 			!isInViewport(
 				elementsToHighlight[0]!,
-				_options.scrollWhenOffscreen === 'top',
+				_options.scrollStrategy.whenWhatPartIsHidden,
 			)
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
-				behavior: 'smooth',
-				block: _options.scrollWhenOffscreen === 'top' ? 'start' : 'center',
-				inline: _options.scrollWhenOffscreen === 'top' ? 'start' : 'center',
+				behavior: _options.scrollStrategy.behavior,
+				block: _options.scrollStrategy.logicalPosition,
+				inline: _options.scrollStrategy.logicalPosition,
 			})
 		}
 
