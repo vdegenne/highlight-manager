@@ -1,5 +1,5 @@
 import {querySelectorAll} from 'html-vision'
-import {checkVisibility, VisibilityCheck, sleep} from './utils.js'
+import {checkVisibility, VisibilityCheck, sleep, CheckIf} from './utils.js'
 
 interface Info {
 	elements: HTMLElement[]
@@ -25,9 +25,9 @@ interface ScrollStrategy {
 	 * The visibility check to use to determine
 	 * whether or not the scroll should be issued.
 	 *
-	 * @default 'top'
+	 * @default when top is not visible
 	 */
-	visibilityCheck: VisibilityCheck
+	when: CheckIf
 	/**
 	 * @default 'smooth'
 	 */
@@ -42,7 +42,7 @@ interface ScrollStrategy {
 	inline: ScrollLogicalPosition | undefined
 }
 const scrollStrategyDefaults: ScrollStrategy = {
-	visibilityCheck: 'top',
+	when: (is) => !is('top-visible'),
 	behavior: 'smooth',
 	block: undefined,
 	inline: undefined,
@@ -348,10 +348,7 @@ export class HighLightManager {
 
 		if (
 			_options.scrollStrategy &&
-			!checkVisibility(
-				elementsToHighlight[0]!,
-				_options.scrollStrategy.visibilityCheck,
-			)
+			!checkVisibility(elementsToHighlight[0]!, _options.scrollStrategy.when)
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
 				behavior: _options.scrollStrategy.behavior,
