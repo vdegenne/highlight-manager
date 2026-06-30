@@ -9,21 +9,23 @@ export function sleep(milli: number = 1000) {
 // 	)
 // }
 
-export type IsInViewportPartCheck =
+export type VisibilityCheck =
 	| 'top'
 	| 'center'
 	| 'bounding-rect'
 	| 'bottom'
+	| 'fully-visible'
+	| 'not-fully-visible'
 
-export function isInViewport(
+export function checkVisibility(
 	el: HTMLElement,
-	partCheck: IsInViewportPartCheck = 'center',
+	visibilityCheck: VisibilityCheck = 'top',
 ): boolean {
 	const rect = el.getBoundingClientRect()
 	const viewHeight = window.innerHeight || document.documentElement.clientHeight
 	const viewWidth = window.innerWidth || document.documentElement.clientWidth
 
-	switch (partCheck) {
+	switch (visibilityCheck) {
 		case 'top':
 			return rect.top >= 0 && rect.top <= viewHeight
 
@@ -40,6 +42,22 @@ export function isInViewport(
 				centerX <= viewWidth
 			)
 		}
+
+		case 'fully-visible':
+			return (
+				rect.top >= 0 &&
+				rect.left >= 0 &&
+				rect.bottom <= viewHeight &&
+				rect.right <= viewWidth
+			)
+
+		case 'not-fully-visible':
+			return (
+				rect.top < 0 ||
+				rect.left < 0 ||
+				rect.bottom > viewHeight ||
+				rect.right > viewWidth
+			)
 
 		case 'bounding-rect':
 		default:

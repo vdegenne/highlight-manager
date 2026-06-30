@@ -1,5 +1,5 @@
 import {querySelectorAll} from 'html-vision'
-import {isInViewport, IsInViewportPartCheck, sleep} from './utils.js'
+import {checkVisibility, VisibilityCheck, sleep} from './utils.js'
 
 interface Info {
 	elements: HTMLElement[]
@@ -22,9 +22,12 @@ interface Info {
 
 interface ScrollStrategy {
 	/**
-	 * @default 'center'
+	 * The visibility check to use to determine
+	 * whether or not the scroll should be issued.
+	 *
+	 * @default 'top'
 	 */
-	whenWhatPartIsHidden: IsInViewportPartCheck
+	visibilityCheck: VisibilityCheck
 	/**
 	 * @default 'smooth'
 	 */
@@ -39,7 +42,7 @@ interface ScrollStrategy {
 	inline: ScrollLogicalPosition | undefined
 }
 const scrollStrategyDefaults: ScrollStrategy = {
-	whenWhatPartIsHidden: 'center',
+	visibilityCheck: 'top',
 	behavior: 'smooth',
 	block: undefined,
 	inline: undefined,
@@ -345,9 +348,9 @@ export class HighLightManager {
 
 		if (
 			_options.scrollStrategy &&
-			!isInViewport(
+			!checkVisibility(
 				elementsToHighlight[0]!,
-				_options.scrollStrategy.whenWhatPartIsHidden,
+				_options.scrollStrategy.visibilityCheck,
 			)
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
@@ -386,7 +389,7 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = [...elements].reverse().find((el) => isInViewport(el))
+				const found = [...elements].reverse().find((el) => checkVisibility(el))
 
 				if (found) {
 					const i = elements.indexOf(found)
@@ -400,7 +403,7 @@ export class HighLightManager {
 		}
 
 		const currEl = elements[currIndex]
-		const currIsVisible = currEl ? isInViewport(currEl) : false
+		const currIsVisible = currEl ? checkVisibility(currEl) : false
 
 		const currIsBelow = currEl
 			? currEl.getBoundingClientRect().top > window.innerHeight
@@ -412,7 +415,7 @@ export class HighLightManager {
 			const found = elements
 				.slice(0, currIndex)
 				.reverse()
-				.find((el) => isInViewport(el))
+				.find((el) => checkVisibility(el))
 
 			if (found) {
 				prevIndex = elements.indexOf(found)
@@ -445,7 +448,7 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = elements.find((el) => isInViewport(el))
+				const found = elements.find((el) => checkVisibility(el))
 				if (found) {
 					const i = elements.indexOf(found)
 					this.highlight(i, i, true, cache)
@@ -458,7 +461,7 @@ export class HighLightManager {
 		}
 
 		const currEl = elements[currIndex]
-		const currIsVisible = currEl ? isInViewport(currEl) : false
+		const currIsVisible = currEl ? checkVisibility(currEl) : false
 
 		const currIsAbove = currEl
 			? currEl.getBoundingClientRect().bottom < 0
@@ -467,7 +470,9 @@ export class HighLightManager {
 		let nextIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
-			const found = elements.slice(currIndex + 1).find((el) => isInViewport(el))
+			const found = elements
+				.slice(currIndex + 1)
+				.find((el) => checkVisibility(el))
 
 			if (found) {
 				nextIndex = elements.indexOf(found)
