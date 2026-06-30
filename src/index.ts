@@ -30,14 +30,19 @@ interface ScrollStrategy {
 	 */
 	behavior: ScrollBehavior
 	/**
-	 * @default 'start'
+	 * @default undefined
 	 */
-	logicalPosition: ScrollLogicalPosition
+	block: ScrollLogicalPosition | undefined
+	/**
+	 * @default undefined
+	 */
+	inline: ScrollLogicalPosition | undefined
 }
 const scrollStrategyDefaults: ScrollStrategy = {
 	whenWhatPartIsHidden: 'center',
 	behavior: 'smooth',
-	logicalPosition: 'start',
+	block: undefined,
+	inline: undefined,
 }
 
 interface Options {
@@ -66,6 +71,8 @@ interface Options {
 	applyStyleSheetTo: Document | HTMLElement | ShadowRoot
 
 	/**
+	 * Set to at least `{}` to activate scrolling when offscreen
+	 *
 	 * @default undefined
 	 */
 	scrollStrategy: Partial<ScrollStrategy> | undefined
@@ -344,8 +351,8 @@ export class HighLightManager {
 		) {
 			elementsToHighlight[0]?.scrollIntoView({
 				behavior: _options.scrollStrategy.behavior,
-				block: _options.scrollStrategy.logicalPosition,
-				inline: _options.scrollStrategy.logicalPosition,
+				block: _options.scrollStrategy.block,
+				inline: _options.scrollStrategy.block,
 			})
 		}
 
