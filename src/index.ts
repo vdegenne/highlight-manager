@@ -68,7 +68,7 @@ interface Options {
 	/**
 	 * @default undefined
 	 */
-	scrollStrategy: ScrollStrategy | undefined
+	scrollStrategy: Partial<ScrollStrategy> | undefined
 
 	/**
 	 * If true, will select the next visible candidate if the highlight is offscreen.
@@ -105,7 +105,7 @@ export function setGlobalBeforeHighlight(fct: () => void) {
 }
 
 interface HighlightOptions {
-	scrollStrategy: ScrollStrategy | undefined
+	scrollStrategy: Partial<ScrollStrategy> | undefined
 }
 
 export class HighLightManager {
@@ -289,7 +289,7 @@ export class HighLightManager {
 		end?: number,
 		unhighlightAll = true,
 		cache = false,
-		options?: HighlightOptions,
+		options: Partial<HighlightOptions> = {},
 	): boolean {
 		if (end === undefined) {
 			end = start
@@ -312,11 +312,14 @@ export class HighLightManager {
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
 		const _options: HighlightOptions = {
-			scrollStrategy: {
-				...scrollStrategyDefaults,
-				...this.#options.scrollStrategy,
-				...options?.scrollStrategy,
-			},
+			scrollStrategy:
+				options?.scrollStrategy || this.#options.scrollStrategy
+					? {
+							...scrollStrategyDefaults,
+							...this.#options.scrollStrategy,
+							...options?.scrollStrategy,
+						}
+					: undefined,
 		}
 
 		globalBeforeHighlight?.()
