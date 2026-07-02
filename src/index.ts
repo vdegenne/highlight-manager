@@ -1,5 +1,11 @@
 import {querySelectorAll} from 'html-vision'
-import {checkVisibility, VisibilityCheck, sleep, CheckIf} from './utils.js'
+import {
+	ScrollStrategy,
+	isInViewport,
+	scrollIntoView,
+	scrollStrategyDefaults,
+	sleep,
+} from './utils.js'
 
 interface Info {
 	elements: HTMLElement[]
@@ -20,40 +26,12 @@ interface Info {
 	highlightContent: string | undefined
 }
 
-interface ScrollStrategy {
-	/**
-	 * The visibility check to use to determine
-	 * whether or not the scroll should be issued.
-	 *
-	 * @default when top is not visible
-	 */
-	when: CheckIf
-	/**
-	 * @default 'smooth'
-	 */
-	behavior: ScrollBehavior
-	/**
-	 * @default undefined
-	 */
-	block: ScrollLogicalPosition | undefined
-	/**
-	 * @default undefined
-	 */
-	inline: ScrollLogicalPosition | undefined
-}
-const scrollStrategyDefaults: ScrollStrategy = {
-	when: (is) => !is('top-visible'),
-	behavior: 'smooth',
-	block: undefined,
-	inline: undefined,
-}
-
 interface Options {
 	css: string
 	highlightTextColor: string
 
 	/**
-	 * @default true
+	 * @default false
 	 */
 	loop: boolean
 	/**
@@ -98,7 +76,7 @@ const defaults: Options = {
 	// css: 'background-color: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important',
 	// css: 'background-color: var(--md-sys-color-outline-variant) !important; color: var(--md-sys-color-on-surface) !important',
 	highlightTextColor: 'var(--md-sys-color-on-primary-container)',
-	loop: true,
+	loop: false,
 	beforeHighlight: undefined,
 	onSelectionChange: undefined,
 	applyStyleSheetTo: document,
@@ -157,6 +135,13 @@ export class HighLightManager {
 		applyTo.adoptedStyleSheets.push(this.#ss)
 		// this.#ss.replaceSync(`[highlight] {${css}}`);
 		this.replaceCSS(this.#options.css)
+
+		if (this.#options.scrollStrategy) {
+			this.#options.scrollStrategy = {
+				...scrollStrategyDefaults,
+				...this.#options.scrollStrategy,
+			}
+		}
 	}
 
 	replaceCSS(css: string) {
@@ -321,18 +306,6 @@ export class HighLightManager {
 		}
 		// console.log(highlightIndexStart, highlightIndexEnd, start, end)
 
-		const baseScrollStrategy =
-			options?.scrollStrategy ?? this.#options.scrollStrategy
-
-		const _options: HighlightOptions = {
-			scrollStrategy: baseScrollStrategy
-				? {
-						...scrollStrategyDefaults,
-						...baseScrollStrategy,
-					}
-				: undefined,
-		}
-
 		globalBeforeHighlight?.()
 		this.#options.beforeHighlight?.()
 		// playClick()
@@ -346,15 +319,12 @@ export class HighLightManager {
 			return false
 		}
 
-		if (
-			_options.scrollStrategy &&
-			!checkVisibility(elementsToHighlight[0]!, _options.scrollStrategy.when)
-		) {
-			elementsToHighlight[0]?.scrollIntoView({
-				behavior: _options.scrollStrategy.behavior,
-				block: _options.scrollStrategy.block,
-				inline: _options.scrollStrategy.block,
-			})
+		const scrollStrategy =
+			options && 'scrollStrategy' in options
+				? options.scrollStrategy
+				: this.#options.scrollStrategy
+		if (scrollStrategy) {
+			scrollIntoView(elementsToHighlight[0]!, scrollStrategy)
 		}
 
 		elementsToHighlight.forEach((el) =>
@@ -372,6 +342,7 @@ export class HighLightManager {
 	previous(step = 1, cache = false) {
 		const {elements, highlightIndexStart, highlightIndexEnd} =
 			this.getInfo(cache)
+		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
 		if (len === 0) {
@@ -386,11 +357,11 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = [...elements].reverse().find((el) => checkVisibility(el))
+				const found = [...elements].reverse().find(isInViewport)
 
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, cache)
+					this.highlight(i, i, true, cache, {scrollStrategy: undefined})
 					return
 				}
 			}
@@ -400,7 +371,7 @@ export class HighLightManager {
 		}
 
 		const currEl = elements[currIndex]
-		const currIsVisible = currEl ? checkVisibility(currEl) : false
+		const currIsVisible = currEl ? isInViewport(currEl) : false
 
 		const currIsBelow = currEl
 			? currEl.getBoundingClientRect().top > window.innerHeight
@@ -409,12 +380,10 @@ export class HighLightManager {
 		let prevIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
-			const found = elements
-				.slice(0, currIndex)
-				.reverse()
-				.find((el) => checkVisibility(el))
+			const found = elements.slice(0, currIndex).reverse().find(isInViewport)
 
 			if (found) {
+				scrollStrategy = undefined
 				prevIndex = elements.indexOf(found)
 			}
 		}
@@ -425,12 +394,13 @@ export class HighLightManager {
 				: Math.max(0, currIndex - step)
 		}
 
-		this.highlight(prevIndex, prevIndex, true, cache)
+		this.highlight(prevIndex, prevIndex, true, cache, {scrollStrategy})
 	}
 
 	next(step = 1, cache = false) {
 		const {elements, highlightIndexStart, highlightIndexEnd} =
 			this.getInfo(cache)
+		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
 		if (len === 0) {
@@ -445,10 +415,10 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = elements.find((el) => checkVisibility(el))
+				const found = elements.find(isInViewport)
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, cache)
+					this.highlight(i, i, true, cache, {scrollStrategy: undefined})
 					return
 				}
 			}
@@ -458,7 +428,7 @@ export class HighLightManager {
 		}
 
 		const currEl = elements[currIndex]
-		const currIsVisible = currEl ? checkVisibility(currEl) : false
+		const currIsVisible = currEl ? isInViewport(currEl) : false
 
 		const currIsAbove = currEl
 			? currEl.getBoundingClientRect().bottom < 0
@@ -467,11 +437,10 @@ export class HighLightManager {
 		let nextIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
-			const found = elements
-				.slice(currIndex + 1)
-				.find((el) => checkVisibility(el))
+			const found = elements.slice(currIndex + 1).find(isInViewport)
 
 			if (found) {
+				scrollStrategy = undefined // Do not scroll
 				nextIndex = elements.indexOf(found)
 			}
 		}
@@ -482,7 +451,7 @@ export class HighLightManager {
 				: Math.min(len - 1, currIndex + step)
 		}
 
-		this.highlight(nextIndex, nextIndex, true, cache)
+		this.highlight(nextIndex, nextIndex, true, cache, {scrollStrategy})
 	}
 
 	extendLeftHighlight(step = 1, cache = false) {

@@ -2,13 +2,6 @@ export function sleep(milli: number = 1000) {
 	return new Promise((r) => setTimeout(r, milli))
 }
 
-// export function isInViewport(el: Element) {
-// 	return (
-// 		el.getBoundingClientRect().top >= 0 &&
-// 		el.getBoundingClientRect().bottom <= window.innerHeight
-// 	)
-// }
-
 export type VisibilityCheck =
 	| 'top-visible'
 	| 'center-visible'
@@ -68,4 +61,90 @@ export function checkVisibility(
 	}
 
 	return checkIf(is)
+}
+
+export function isInViewport(el: HTMLElement) {
+	return checkVisibility(el, (is) => is('partially-visible'))
+}
+
+export interface ScrollStrategy {
+	/**
+	 * The visibility check to use to determine
+	 * whether or not the scroll should be issued.
+	 *
+	 * @default when top is not visible
+	 */
+	if: CheckIf
+	/**
+	 * @default 'smooth'
+	 */
+	behavior: ScrollBehavior
+	/**
+	 * @default undefined
+	 */
+	block: ScrollLogicalPosition | undefined
+	/**
+	 * @default undefined
+	 */
+	inline: ScrollLogicalPosition | undefined
+
+	/**
+	 * @default 10px
+	 */
+	yOffsetPx: number
+}
+export const scrollStrategyDefaults: ScrollStrategy = {
+	if: (is) => !is('top-visible'),
+	behavior: 'smooth',
+	block: undefined,
+	inline: undefined,
+	yOffsetPx: 10,
+}
+
+export function scrollIntoView(
+	el: HTMLElement,
+	options?: Partial<ScrollStrategy>,
+): void {
+	const _options = {
+		...scrollStrategyDefaults,
+		...options,
+	}
+	const {if: _if, behavior, block, yOffsetPx} = _options
+
+	if (!checkVisibility(el, _if)) {
+		return
+	}
+
+	const rect = el.getBoundingClientRect()
+
+	let top: number
+
+	switch (block) {
+		case 'center':
+			top = window.scrollY + rect.top - window.innerHeight / 2 + rect.height / 2
+			break
+
+		case 'end':
+			top = window.scrollY + rect.bottom - window.innerHeight
+			break
+
+		case 'nearest':
+			// Simple approximation.
+			if (rect.top < 0) {
+				top = window.scrollY + rect.top
+			} else {
+				top = window.scrollY + rect.bottom - window.innerHeight
+			}
+			break
+
+		case 'start':
+		default:
+			top = window.scrollY + rect.top
+			break
+	}
+
+	window.scrollTo({
+		top: top - yOffsetPx,
+		behavior,
+	})
 }
