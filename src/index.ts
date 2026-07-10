@@ -64,6 +64,13 @@ interface Options {
 	 * @default false
 	 */
 	fastTravel: boolean
+
+	/**
+	 * Whether to call .focus() on the newly highlighted element or not.
+	 *
+	 * @default false
+	 */
+	focusElementOnHighlight: boolean
 }
 
 const defaults: Options = {
@@ -82,6 +89,7 @@ const defaults: Options = {
 	applyStyleSheetTo: document,
 	scrollStrategy: undefined,
 	fastTravel: false,
+	focusElementOnHighlight: false,
 }
 
 // Local array of all declared highlighters for id control.
@@ -330,6 +338,12 @@ export class HighLightManager {
 			el.setAttribute(`highlight${this.#id}`, ''),
 		)
 		// elements[index]?.setAttribute('highlight', '');
+		if (this.#options.focusElementOnHighlight) {
+			elementsToHighlight[elementsToHighlight.length - 1]!.focus({
+				preventScroll: true,
+				// focusVisible: false
+			})
+		}
 
 		if (this.#options.onSelectionChange) {
 			this.#options.onSelectionChange(this.getInfo(false))
@@ -484,3 +498,5 @@ export class HighLightManager {
 		this.highlight(highlightIndexStart, newEnd, true, cache)
 	}
 }
+
+export {ScrollStrategy}
