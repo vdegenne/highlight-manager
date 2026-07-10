@@ -7,7 +7,7 @@ import {
 	sleep,
 } from './utils.js'
 
-interface Info {
+export interface HighlightInfo {
 	elements: HTMLElement[]
 	// /**
 	//  * @deprecated Use highlightIndexStart and highlightIndexEnd instead
@@ -41,7 +41,7 @@ interface Options {
 	 */
 	atomicSelection: (element: HTMLElement, i: number) => boolean
 	beforeHighlight: (() => void) | undefined
-	onSelectionChange: ((info: Info) => void) | undefined
+	onSelectionChange: ((info: HighlightInfo) => void) | undefined
 
 	/**
 	 * By default the stylesheet for selection is applied to the main document.
@@ -97,7 +97,7 @@ interface HighlightOptions {
 }
 
 export class HighLightManager {
-	#cache: Info = {
+	#cache: HighlightInfo = {
 		elements: [],
 		// highlightIndex: -1,
 		highlightIndexStart: -1,
@@ -152,8 +152,7 @@ export class HighLightManager {
 	}
 
 	#highlightWhenAvailablePromiseWR:
-		| PromiseWithResolvers<HTMLElement>
-		| undefined
+		PromiseWithResolvers<HTMLElement> | undefined
 
 	highlightWhenAvailable(
 		index = 0,
@@ -212,7 +211,7 @@ export class HighLightManager {
 		}
 	}
 
-	getInfo(cache = false): Info {
+	getInfo(cache = false): HighlightInfo {
 		if (cache) {
 			return this.#cache
 		}

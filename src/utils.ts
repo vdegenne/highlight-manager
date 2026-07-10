@@ -143,6 +143,12 @@ export function scrollIntoView(
 			break
 	}
 
+	// el.scrollIntoView({
+	// 	behavior,
+	// 	// inline,
+	// 	block,
+	// })
+
 	window.scrollTo({
 		top: top - yOffsetPx,
 		behavior,
