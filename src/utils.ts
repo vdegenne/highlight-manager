@@ -11,7 +11,7 @@ export type VisibilityCheck =
 
 export type CheckIf = (is: (visibility: VisibilityCheck) => boolean) => boolean
 
-export function checkVisibility(
+export function visibilityCheck(
 	el: HTMLElement,
 	/**
 	 * @default top is not visible
@@ -64,7 +64,7 @@ export function checkVisibility(
 }
 
 export function isInViewport(el: HTMLElement) {
-	return checkVisibility(el, (is) => is('partially-visible'))
+	return visibilityCheck(el, (is) => is('partially-visible'))
 }
 
 export interface ScrollStrategy {
@@ -111,7 +111,7 @@ export function scrollIntoView(
 	}
 	const {if: _if, behavior, block, yOffsetPx} = _options
 
-	if (!checkVisibility(el, _if)) {
+	if (!visibilityCheck(el, _if)) {
 		return
 	}
 

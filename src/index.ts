@@ -1,6 +1,7 @@
 import {querySelectorAll} from 'html-vision'
 import {
 	ScrollStrategy,
+	visibilityCheck,
 	isInViewport,
 	scrollIntoView,
 	scrollStrategyDefaults,
@@ -64,6 +65,12 @@ interface Options {
 	 * @default false
 	 */
 	fastTravel: boolean
+	/**
+	 * If true, the fast travel will select the first fully-visible elemnt in the view.
+	 *
+	 * @default true
+	 */
+	fullyVisibleFastTravel: boolean
 
 	/**
 	 * Whether to call .focus() on the newly highlighted element or not.
@@ -89,6 +96,7 @@ const defaults: Options = {
 	applyStyleSheetTo: document,
 	scrollStrategy: undefined,
 	fastTravel: false,
+	fullyVisibleFastTravel: true,
 	focusElementOnHighlight: false,
 }
 
@@ -224,8 +232,8 @@ export class HighLightManager {
 			return this.#cache
 		}
 		// console.log(this.selector)
-		const elements = querySelectorAll<HTMLElement>(this.selector).filter(
-			(el, i) => this.#options.atomicSelection(el, i),
+		const elements = querySelectorAll(this.selector).filter((el, i) =>
+			this.#options.atomicSelection(el, i),
 		)
 		const highlightElements = elements.filter((el) =>
 			el.hasAttribute(`highlight${this.#id}`),
@@ -370,7 +378,13 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = [...elements].reverse().find(isInViewport)
+				const found = [...elements]
+					.reverse()
+					.find((el) =>
+						this.#options.fullyVisibleFastTravel
+							? visibilityCheck(el, (is) => is('fully-visible'))
+							: isInViewport(el),
+					)
 
 				if (found) {
 					const i = elements.indexOf(found)
@@ -393,7 +407,14 @@ export class HighLightManager {
 		let prevIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
-			const found = elements.slice(0, currIndex).reverse().find(isInViewport)
+			const found = elements
+				.slice(0, currIndex)
+				.reverse()
+				.find((el) =>
+					this.#options.fullyVisibleFastTravel
+						? visibilityCheck(el, (is) => is('fully-visible'))
+						: isInViewport(el),
+				)
 
 			if (found) {
 				scrollStrategy = undefined
@@ -428,7 +449,11 @@ export class HighLightManager {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = elements.find(isInViewport)
+				const found = elements.find((el) =>
+					this.#options.fullyVisibleFastTravel
+						? visibilityCheck(el, (is) => is('fully-visible'))
+						: isInViewport(el),
+				)
 				if (found) {
 					const i = elements.indexOf(found)
 					this.highlight(i, i, true, cache, {scrollStrategy: undefined})
@@ -450,7 +475,13 @@ export class HighLightManager {
 		let nextIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
-			const found = elements.slice(currIndex + 1).find(isInViewport)
+			const found = elements
+				.slice(currIndex + 1)
+				.find((el) =>
+					this.#options.fullyVisibleFastTravel
+						? visibilityCheck(el, (is) => is('fully-visible'))
+						: isInViewport(el),
+				)
 
 			if (found) {
 				scrollStrategy = undefined // Do not scroll
