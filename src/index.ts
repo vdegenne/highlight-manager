@@ -373,7 +373,7 @@ export class HighLightManager {
 
 		const currIndex =
 			highlightIndexStart !== highlightIndexEnd
-				? highlightIndexStart
+				? highlightIndexStart + 1
 				: highlightIndexStart
 
 		if (currIndex === -1) {
@@ -444,7 +444,7 @@ export class HighLightManager {
 
 		const currIndex =
 			highlightIndexStart !== highlightIndexEnd
-				? highlightIndexEnd
+				? highlightIndexEnd - 1
 				: highlightIndexEnd
 
 		if (currIndex === -1) {
