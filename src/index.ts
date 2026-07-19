@@ -528,6 +528,17 @@ export class HighLightManager {
 		const newEnd = Math.max(0, highlightIndexEnd - step)
 		this.highlight(highlightIndexStart, newEnd, true, cache)
 	}
+
+	highlightLast(cache = false) {
+		const {elements} = this.getInfo(cache)
+
+		if (elements.length === 0) {
+			this.highlight(-1, -1, true, cache)
+			return
+		}
+
+		this.highlight(elements.length - 1, elements.length - 1, true, cache)
+	}
 }
 
 export {ScrollStrategy}
