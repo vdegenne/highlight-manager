@@ -27,7 +27,7 @@ export interface HighlightInfo {
 	highlightContent: string | undefined
 }
 
-interface Options {
+interface Options<T = any> {
 	css: string
 	highlightTextColor: string
 
@@ -78,6 +78,8 @@ interface Options {
 	 * @default false
 	 */
 	focusElementOnHighlight: boolean
+
+	getInfoMiddleware?: (info: HighlightInfo) => T
 }
 
 const defaults: Options = {
@@ -112,7 +114,7 @@ interface HighlightOptions {
 	scrollStrategy: Partial<ScrollStrategy> | undefined
 }
 
-export class HighLightManager {
+export class HighLightManager<T = any> {
 	#cache: HighlightInfo = {
 		elements: [],
 		// highlightIndex: -1,
@@ -227,7 +229,7 @@ export class HighLightManager {
 		}
 	}
 
-	getInfo(cache = false): HighlightInfo {
+	getInfo(cache = false): HighlightInfo | (HighlightInfo & T) {
 		if (cache) {
 			return this.#cache
 		}
@@ -266,7 +268,7 @@ export class HighLightManager {
 			.join('')
 		// highlightElement?.innerText.trim();
 
-		return (this.#cache = {
+		const base = {
 			elements,
 			// highlightIndex,
 			highlightIndexStart,
@@ -274,7 +276,13 @@ export class HighLightManager {
 			highlightElements,
 			highlightElement: highlightElements[0],
 			highlightContent,
-		})
+		}
+
+		this.#cache = base
+
+		const extra = this.#options.getInfoMiddleware?.(base)
+
+		return {...base, ...extra}
 	}
 
 	unhighlightAll(elements?: HTMLElement[], cache = true) {
