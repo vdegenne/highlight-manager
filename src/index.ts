@@ -215,12 +215,13 @@ export class HighLightManager<T = {}> {
 		options: {
 			/**
 			 * If true, will not run the getInfo middleware to process faster.
+			 *
 			 * @default false
 			 */
 			internal?: boolean
 		} = {},
 	): HighlightInfo & T {
-		options.internal ??= true
+		options.internal ??= false
 
 		// console.log(this.selector)
 		const elements = querySelectorAll(this.selector).filter((el, i) =>
@@ -278,13 +279,13 @@ export class HighLightManager<T = {}> {
 
 	unhighlightAll(elements?: HTMLElement[]) {
 		if (!elements) {
-			elements = this.getInfo().elements
+			elements = this.getInfo({internal: true}).elements
 		}
 		elements.forEach((el) => el.removeAttribute(`highlight${this.#id}`))
 	}
 
 	highlightAll() {
-		const {elements} = this.getInfo()
+		const {elements} = this.getInfo({internal: true})
 		this.highlight(0, elements.length - 1, false)
 	}
 	// alias
@@ -310,7 +311,9 @@ export class HighLightManager<T = {}> {
 			// end = tmp
 		}
 
-		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		// console.log(elements)
 
 		if (highlightIndexStart === start && highlightIndexEnd === end) {
@@ -358,7 +361,9 @@ export class HighLightManager<T = {}> {
 	}
 
 	previous(step = 1) {
-		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
@@ -428,7 +433,9 @@ export class HighLightManager<T = {}> {
 	}
 
 	next(step = 1) {
-		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
@@ -494,32 +501,40 @@ export class HighLightManager<T = {}> {
 	}
 
 	extendLeftHighlight(step = 1) {
-		const {highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		const newStart = Math.max(0, highlightIndexStart - step)
 		this.highlight(newStart, highlightIndexEnd, false)
 	}
 	reduceLeftHighlight(step = 1) {
-		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		// TODO: should prob change the min to end index
 		const newStart = Math.min(elements.length - 1, highlightIndexStart + step)
 		this.highlight(newStart, highlightIndexEnd, true)
 	}
 
 	extendRightHighlight(step = 1) {
-		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		const newEnd = Math.min(elements.length - 1, highlightIndexEnd + step)
 		this.highlight(highlightIndexStart, newEnd, false)
 	}
 
 	reduceRightHighlight(step = 1) {
-		const {highlightIndexStart, highlightIndexEnd} = this.getInfo()
+		const {highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
 		// TODO: should prob change the max to end index
 		const newEnd = Math.max(0, highlightIndexEnd - step)
 		this.highlight(highlightIndexStart, newEnd, true)
 	}
 
 	highlightLast() {
-		const {elements} = this.getInfo()
+		const {elements} = this.getInfo({internal: true})
 
 		if (elements.length === 0) {
 			this.highlight(-1, -1, true)
