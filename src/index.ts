@@ -546,3 +546,10 @@ export class HighLightManager<T = {}> {
 }
 
 export {ScrollStrategy}
+
+export function createHighlighter<T>(
+	selector: string,
+	options: Partial<Options<T>>,
+) {
+	return new HighLightManager<T>(selector, options)
+}
