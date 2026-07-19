@@ -1,24 +1,17 @@
 import {querySelectorAll} from 'html-vision'
 import {
-	ScrollStrategy,
-	visibilityCheck,
 	isInViewport,
 	scrollIntoView,
+	ScrollStrategy,
 	scrollStrategyDefaults,
 	sleep,
+	visibilityCheck,
 } from './utils.js'
 
 export interface HighlightInfo {
 	elements: HTMLElement[]
-	// /**
-	//  * @deprecated Use highlightIndexStart and highlightIndexEnd instead
-	//  */
-	// highlightIndex: number;
 	highlightIndexStart: number
 	highlightIndexEnd: number
-	///**
-	// * @deprecated Use highlightElements instead
-	// */
 	highlightElements: HTMLElement[]
 	/**
 	 * First element of highlightElements if there is one
@@ -27,7 +20,7 @@ export interface HighlightInfo {
 	highlightContent: string | undefined
 }
 
-interface Options<T = any> {
+interface Options<T = {}> {
 	css: string
 	highlightTextColor: string
 
@@ -82,7 +75,7 @@ interface Options<T = any> {
 	getInfoMiddleware?: (info: HighlightInfo) => T
 }
 
-const defaults: Options = {
+const defaults: Options<any> = {
 	atomicSelection(_element) {
 		return true
 	},
@@ -100,10 +93,10 @@ const defaults: Options = {
 	fastTravel: false,
 	fullyVisibleFastTravel: true,
 	focusElementOnHighlight: false,
-}
+} // satisfies Omit<Options<any>, 'getInfoMiddleware'>
 
 // Local array of all declared highlighters for id control.
-const highlighters: HighLightManager[] = []
+const highlighters: HighLightManager<any>[] = []
 
 let globalBeforeHighlight: (() => void) | undefined
 export function setGlobalBeforeHighlight(fct: () => void) {
@@ -114,18 +107,8 @@ interface HighlightOptions {
 	scrollStrategy: Partial<ScrollStrategy> | undefined
 }
 
-export class HighLightManager<T = any> {
-	#cache: HighlightInfo = {
-		elements: [],
-		// highlightIndex: -1,
-		highlightIndexStart: -1,
-		highlightIndexEnd: -1,
-		// highlightElement: undefined,
-		highlightElements: [],
-		highlightElement: undefined,
-		highlightContent: undefined,
-	}
-	#options: Options
+export class HighLightManager<T = {}> {
+	#options: Options<T>
 
 	#ss: CSSStyleSheet
 
@@ -133,7 +116,7 @@ export class HighLightManager<T = any> {
 
 	constructor(
 		protected selector: string,
-		options?: Partial<Options>,
+		options?: Partial<Options<T>>,
 	) {
 		this.#id = highlighters.push(this)
 		this.#options = {...defaults, ...options}
@@ -199,8 +182,7 @@ export class HighLightManager<T = any> {
 						index,
 						index,
 						true,
-						false,
-						// TODO: This should be uncommented?
+						// TODO: should we uncomment
 						// {
 						// 	scrollStrategy: undefined, // Disable scrolling on first highlight
 						// },
@@ -229,10 +211,17 @@ export class HighLightManager<T = any> {
 		}
 	}
 
-	getInfo(cache = false): HighlightInfo | (HighlightInfo & T) {
-		if (cache) {
-			return this.#cache
-		}
+	getInfo(
+		options: {
+			/**
+			 * If true, will not run the getInfo middleware to process faster.
+			 * @default false
+			 */
+			internal?: boolean
+		} = {},
+	): HighlightInfo & T {
+		options.internal ??= true
+
 		// console.log(this.selector)
 		const elements = querySelectorAll(this.selector).filter((el, i) =>
 			this.#options.atomicSelection(el, i),
@@ -268,7 +257,7 @@ export class HighLightManager<T = any> {
 			.join('')
 		// highlightElement?.innerText.trim();
 
-		const base = {
+		const base: HighlightInfo = {
 			elements,
 			// highlightIndex,
 			highlightIndexStart,
@@ -278,23 +267,25 @@ export class HighLightManager<T = any> {
 			highlightContent,
 		}
 
-		this.#cache = base
+		let extra = {} as T
 
-		const extra = this.#options.getInfoMiddleware?.(base)
+		if (!options.internal) {
+			extra = this.#options.getInfoMiddleware?.(base) ?? ({} as T)
+		}
 
 		return {...base, ...extra}
 	}
 
-	unhighlightAll(elements?: HTMLElement[], cache = true) {
+	unhighlightAll(elements?: HTMLElement[]) {
 		if (!elements) {
-			elements = this.getInfo(cache).elements
+			elements = this.getInfo().elements
 		}
 		elements.forEach((el) => el.removeAttribute(`highlight${this.#id}`))
 	}
 
-	highlightAll(cache = false) {
-		const {elements} = this.getInfo(cache)
-		this.highlight(0, elements.length - 1, false, cache)
+	highlightAll() {
+		const {elements} = this.getInfo()
+		this.highlight(0, elements.length - 1, false)
 	}
 	// alias
 	selectAll = this.highlightAll.bind(this)
@@ -306,7 +297,6 @@ export class HighLightManager<T = any> {
 		start: number,
 		end?: number,
 		unhighlightAll = true,
-		cache = false,
 		options: Partial<HighlightOptions> = {},
 	): boolean {
 		if (end === undefined) {
@@ -320,8 +310,7 @@ export class HighLightManager<T = any> {
 			// end = tmp
 		}
 
-		const {elements, highlightIndexStart, highlightIndexEnd} =
-			this.getInfo(cache)
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		// console.log(elements)
 
 		if (highlightIndexStart === start && highlightIndexEnd === end) {
@@ -334,7 +323,7 @@ export class HighLightManager<T = any> {
 		// playClick()
 
 		if (unhighlightAll) {
-			this.unhighlightAll(elements, cache)
+			this.unhighlightAll(elements)
 		}
 
 		const elementsToHighlight = elements.slice(start, end + 1)
@@ -362,20 +351,19 @@ export class HighLightManager<T = any> {
 		}
 
 		if (this.#options.onSelectionChange) {
-			this.#options.onSelectionChange(this.getInfo(false))
+			this.#options.onSelectionChange(this.getInfo())
 		}
 
 		return true
 	}
 
-	previous(step = 1, cache = false) {
-		const {elements, highlightIndexStart, highlightIndexEnd} =
-			this.getInfo(cache)
+	previous(step = 1) {
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
 		if (len === 0) {
-			this.highlight(-1, -1, true, cache)
+			this.highlight(-1, -1, true)
 			return
 		}
 
@@ -396,12 +384,12 @@ export class HighLightManager<T = any> {
 
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, cache, {scrollStrategy: undefined})
+					this.highlight(i, i, true, {scrollStrategy: undefined})
 					return
 				}
 			}
 
-			this.highlight(len - 1, len - 1, true, cache)
+			this.highlight(len - 1, len - 1, true)
 			return
 		}
 
@@ -436,17 +424,16 @@ export class HighLightManager<T = any> {
 				: Math.max(0, currIndex - step)
 		}
 
-		this.highlight(prevIndex, prevIndex, true, cache, {scrollStrategy})
+		this.highlight(prevIndex, prevIndex, true, {scrollStrategy})
 	}
 
-	next(step = 1, cache = false) {
-		const {elements, highlightIndexStart, highlightIndexEnd} =
-			this.getInfo(cache)
+	next(step = 1) {
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		let scrollStrategy = this.#options.scrollStrategy
 
 		const len = elements.length
 		if (len === 0) {
-			this.highlight(-1, -1, true, cache)
+			this.highlight(-1, -1, true)
 			return
 		}
 
@@ -464,12 +451,12 @@ export class HighLightManager<T = any> {
 				)
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, cache, {scrollStrategy: undefined})
+					this.highlight(i, i, true, {scrollStrategy: undefined})
 					return
 				}
 			}
 
-			this.highlight(0, 0, true, cache)
+			this.highlight(0, 0, true)
 			return
 		}
 
@@ -503,49 +490,43 @@ export class HighLightManager<T = any> {
 				: Math.min(len - 1, currIndex + step)
 		}
 
-		this.highlight(nextIndex, nextIndex, true, cache, {scrollStrategy})
+		this.highlight(nextIndex, nextIndex, true, {scrollStrategy})
 	}
 
-	extendLeftHighlight(step = 1, cache = false) {
-		// playClick();
-		const {highlightIndexStart, highlightIndexEnd} = this.getInfo(cache)
+	extendLeftHighlight(step = 1) {
+		const {highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		const newStart = Math.max(0, highlightIndexStart - step)
-		this.highlight(newStart, highlightIndexEnd, false, cache)
+		this.highlight(newStart, highlightIndexEnd, false)
 	}
-	reduceLeftHighlight(step = 1, cache = false) {
-		// playClick();
-		const {elements, highlightIndexStart, highlightIndexEnd} =
-			this.getInfo(cache)
+	reduceLeftHighlight(step = 1) {
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		// TODO: should prob change the min to end index
 		const newStart = Math.min(elements.length - 1, highlightIndexStart + step)
-		this.highlight(newStart, highlightIndexEnd, true, cache)
+		this.highlight(newStart, highlightIndexEnd, true)
 	}
 
-	extendRightHighlight(step = 1, cache = false) {
-		// playClick();
-		const {elements, highlightIndexStart, highlightIndexEnd} =
-			this.getInfo(cache)
+	extendRightHighlight(step = 1) {
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		const newEnd = Math.min(elements.length - 1, highlightIndexEnd + step)
-		this.highlight(highlightIndexStart, newEnd, false, cache)
+		this.highlight(highlightIndexStart, newEnd, false)
 	}
 
-	reduceRightHighlight(step = 1, cache = false) {
-		// playClick();
-		const {highlightIndexStart, highlightIndexEnd} = this.getInfo(cache)
+	reduceRightHighlight(step = 1) {
+		const {highlightIndexStart, highlightIndexEnd} = this.getInfo()
 		// TODO: should prob change the max to end index
 		const newEnd = Math.max(0, highlightIndexEnd - step)
-		this.highlight(highlightIndexStart, newEnd, true, cache)
+		this.highlight(highlightIndexStart, newEnd, true)
 	}
 
-	highlightLast(cache = false) {
-		const {elements} = this.getInfo(cache)
+	highlightLast() {
+		const {elements} = this.getInfo()
 
 		if (elements.length === 0) {
-			this.highlight(-1, -1, true, cache)
+			this.highlight(-1, -1, true)
 			return
 		}
 
-		this.highlight(elements.length - 1, elements.length - 1, true, cache)
+		this.highlight(elements.length - 1, elements.length - 1, true)
 	}
 }
 
