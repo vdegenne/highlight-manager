@@ -1,6 +1,6 @@
 {
 	"name": "@vdegenne/highlight-manager",
-	"version": "0.1.30",
+	"version": "0.1.31",
 	"description": "helper to navigate/highlight elements in a page based on a css selector",
 	"type": "module",
 	"exports": {
@@ -8,6 +8,10 @@
 			"import": "./lib/index.js",
 			"types": "./lib/index.d.ts"
 		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/vdegenne/highlight-manager.git"
 	},
 	"files": [
 		"lib/**",
