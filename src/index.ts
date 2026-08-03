@@ -104,7 +104,14 @@ export function setGlobalBeforeHighlight(fct: () => void) {
 }
 
 interface HighlightOptions {
-	scrollStrategy: Partial<ScrollStrategy> | undefined
+	/**
+	 * Should we unhighlight all highlighted elements before highlighting the next one
+	 *
+	 * @default true
+	 */
+	unhighlightAll: boolean
+
+	scrollStrategy?: Partial<ScrollStrategy> | undefined
 }
 
 export class HighLightManager<T = {}> {
@@ -181,7 +188,6 @@ export class HighLightManager<T = {}> {
 					this.highlight(
 						index,
 						index,
-						true,
 						// TODO: should we uncomment
 						// {
 						// 	scrollStrategy: undefined, // Disable scrolling on first highlight
@@ -286,7 +292,7 @@ export class HighLightManager<T = {}> {
 
 	highlightAll() {
 		const {elements} = this.getInfo({internal: true})
-		this.highlight(0, elements.length - 1, false)
+		this.highlight(0, elements.length - 1, {unhighlightAll: false})
 	}
 	// alias
 	selectAll = this.highlightAll.bind(this)
@@ -297,9 +303,13 @@ export class HighLightManager<T = {}> {
 	highlight(
 		start: number,
 		end?: number,
-		unhighlightAll = true,
-		options: Partial<HighlightOptions> = {},
+		options?: Partial<HighlightOptions>,
 	): boolean {
+		const _options: HighlightOptions = {
+			unhighlightAll: true,
+			...options,
+		}
+
 		if (end === undefined) {
 			end = start
 		}
@@ -325,7 +335,7 @@ export class HighLightManager<T = {}> {
 		this.#options.beforeHighlight?.()
 		// playClick()
 
-		if (unhighlightAll) {
+		if (_options.unhighlightAll) {
 			this.unhighlightAll(elements)
 		}
 
@@ -335,8 +345,8 @@ export class HighLightManager<T = {}> {
 		}
 
 		const scrollStrategy =
-			options && 'scrollStrategy' in options
-				? options.scrollStrategy
+			'scrollStrategy' in _options
+				? _options.scrollStrategy
 				: this.#options.scrollStrategy
 		if (scrollStrategy) {
 			scrollIntoView(elementsToHighlight[0]!, scrollStrategy)
@@ -354,7 +364,7 @@ export class HighLightManager<T = {}> {
 		}
 
 		if (this.#options.onSelectionChange) {
-			this.#options.onSelectionChange(this.getInfo())
+			this.#options.onSelectionChange(this.getInfo({internal: true}))
 		}
 
 		return true
@@ -368,7 +378,7 @@ export class HighLightManager<T = {}> {
 
 		const len = elements.length
 		if (len === 0) {
-			this.highlight(-1, -1, true)
+			this.highlight(-1, -1)
 			return
 		}
 
@@ -379,22 +389,30 @@ export class HighLightManager<T = {}> {
 
 		if (currIndex === -1) {
 			if (this.#options.fastTravel) {
-				const found = [...elements]
-					.reverse()
-					.find((el) =>
-						this.#options.fullyVisibleFastTravel
-							? visibilityCheck(el, (is) => is('fully-visible'))
-							: isInViewport(el),
-					)
+				const candidates = elements.reverse()
+				const found = candidates.find((el) =>
+					this.#options.fullyVisibleFastTravel
+						? visibilityCheck(el, (is) => is('fully-visible'))
+						: isInViewport(el),
+				)
 
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, {scrollStrategy: undefined})
+					this.highlight(i, i, {scrollStrategy: undefined})
 					return
+				}
+				// TODO: experimental, remove if it fails
+				else {
+					const found = candidates.find(isInViewport)
+					if (found) {
+						const i = elements.indexOf(found)
+						this.highlight(i, i, {scrollStrategy: undefined})
+						return
+					}
 				}
 			}
 
-			this.highlight(len - 1, len - 1, true)
+			this.highlight(len - 1, len - 1)
 			return
 		}
 
@@ -408,18 +426,24 @@ export class HighLightManager<T = {}> {
 		let prevIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
-			const found = elements
-				.slice(0, currIndex)
-				.reverse()
-				.find((el) =>
-					this.#options.fullyVisibleFastTravel
-						? visibilityCheck(el, (is) => is('fully-visible'))
-						: isInViewport(el),
-				)
+			const candidates = elements.slice(0, currIndex).reverse()
+			const found = candidates.find((el) =>
+				this.#options.fullyVisibleFastTravel
+					? visibilityCheck(el, (is) => is('fully-visible'))
+					: isInViewport(el),
+			)
 
 			if (found) {
 				scrollStrategy = undefined
 				prevIndex = elements.indexOf(found)
+			}
+			// TODO: experimental, remove if it fails
+			else {
+				const found = candidates.find(isInViewport)
+				if (found) {
+					scrollStrategy = undefined
+					prevIndex = elements.indexOf(found)
+				}
 			}
 		}
 
@@ -429,7 +453,7 @@ export class HighLightManager<T = {}> {
 				: Math.max(0, currIndex - step)
 		}
 
-		this.highlight(prevIndex, prevIndex, true, {scrollStrategy})
+		this.highlight(prevIndex, prevIndex, {scrollStrategy})
 	}
 
 	next(step = 1) {
@@ -440,7 +464,7 @@ export class HighLightManager<T = {}> {
 
 		const len = elements.length
 		if (len === 0) {
-			this.highlight(-1, -1, true)
+			this.highlight(-1, -1)
 			return
 		}
 
@@ -458,12 +482,21 @@ export class HighLightManager<T = {}> {
 				)
 				if (found) {
 					const i = elements.indexOf(found)
-					this.highlight(i, i, true, {scrollStrategy: undefined})
+					this.highlight(i, i, {scrollStrategy: undefined})
 					return
+				}
+				// TODO: experimental, remove if it fails
+				else {
+					const found = elements.find(isInViewport)
+					if (found) {
+						const i = elements.indexOf(found)
+						this.highlight(i, i, {scrollStrategy: undefined})
+						return
+					}
 				}
 			}
 
-			this.highlight(0, 0, true)
+			this.highlight(0, 0)
 			return
 		}
 
@@ -477,17 +510,24 @@ export class HighLightManager<T = {}> {
 		let nextIndex = -1
 
 		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
-			const found = elements
-				.slice(currIndex + 1)
-				.find((el) =>
-					this.#options.fullyVisibleFastTravel
-						? visibilityCheck(el, (is) => is('fully-visible'))
-						: isInViewport(el),
-				)
+			const candidates = elements.slice(currIndex + 1)
+			const found = candidates.find((el) =>
+				this.#options.fullyVisibleFastTravel
+					? visibilityCheck(el, (is) => is('fully-visible'))
+					: isInViewport(el),
+			)
 
 			if (found) {
 				scrollStrategy = undefined // Do not scroll
 				nextIndex = elements.indexOf(found)
+			}
+			// TODO: experimental, remove if it fails
+			else {
+				const found = candidates.find(isInViewport)
+				if (found) {
+					scrollStrategy = undefined // Do not scroll
+					nextIndex = elements.indexOf(found)
+				}
 			}
 		}
 
@@ -497,7 +537,7 @@ export class HighLightManager<T = {}> {
 				: Math.min(len - 1, currIndex + step)
 		}
 
-		this.highlight(nextIndex, nextIndex, true, {scrollStrategy})
+		this.highlight(nextIndex, nextIndex, {scrollStrategy})
 	}
 
 	extendLeftHighlight(step = 1) {
@@ -505,7 +545,7 @@ export class HighLightManager<T = {}> {
 			internal: true,
 		})
 		const newStart = Math.max(0, highlightIndexStart - step)
-		this.highlight(newStart, highlightIndexEnd, false)
+		this.highlight(newStart, highlightIndexEnd, {unhighlightAll: false})
 	}
 	reduceLeftHighlight(step = 1) {
 		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
@@ -513,7 +553,7 @@ export class HighLightManager<T = {}> {
 		})
 		// TODO: should prob change the min to end index
 		const newStart = Math.min(elements.length - 1, highlightIndexStart + step)
-		this.highlight(newStart, highlightIndexEnd, true)
+		this.highlight(newStart, highlightIndexEnd)
 	}
 
 	extendRightHighlight(step = 1) {
@@ -521,7 +561,7 @@ export class HighLightManager<T = {}> {
 			internal: true,
 		})
 		const newEnd = Math.min(elements.length - 1, highlightIndexEnd + step)
-		this.highlight(highlightIndexStart, newEnd, false)
+		this.highlight(highlightIndexStart, newEnd, {unhighlightAll: false})
 	}
 
 	reduceRightHighlight(step = 1) {
@@ -530,18 +570,18 @@ export class HighLightManager<T = {}> {
 		})
 		// TODO: should prob change the max to end index
 		const newEnd = Math.max(0, highlightIndexEnd - step)
-		this.highlight(highlightIndexStart, newEnd, true)
+		this.highlight(highlightIndexStart, newEnd)
 	}
 
 	highlightLast() {
 		const {elements} = this.getInfo({internal: true})
 
 		if (elements.length === 0) {
-			this.highlight(-1, -1, true)
+			this.highlight(-1, -1)
 			return
 		}
 
-		this.highlight(elements.length - 1, elements.length - 1, true)
+		this.highlight(elements.length - 1, elements.length - 1)
 	}
 }
 

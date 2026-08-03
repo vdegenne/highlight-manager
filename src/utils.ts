@@ -98,7 +98,7 @@ export const scrollStrategyDefaults: ScrollStrategy = {
 	behavior: 'smooth',
 	block: undefined,
 	inline: undefined,
-	yOffsetPx: 10,
+	yOffsetPx: 0,
 }
 
 export function scrollIntoView(
@@ -109,9 +109,18 @@ export function scrollIntoView(
 		...scrollStrategyDefaults,
 		...options,
 	}
-	const {if: _if, behavior, block, yOffsetPx} = _options
+	const {if: _if, behavior, block, inline, yOffsetPx} = _options
 
 	if (!visibilityCheck(el, _if)) {
+		return
+	}
+
+	if (!yOffsetPx) {
+		el.scrollIntoView({
+			behavior,
+			block,
+			inline,
+		})
 		return
 	}
 
@@ -142,12 +151,6 @@ export function scrollIntoView(
 			top = window.scrollY + rect.top
 			break
 	}
-
-	// el.scrollIntoView({
-	// 	behavior,
-	// 	// inline,
-	// 	block,
-	// })
 
 	window.scrollTo({
 		top: top - yOffsetPx,
