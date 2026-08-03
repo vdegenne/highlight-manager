@@ -1,6 +1,6 @@
 {
 	"name": "@vdegenne/highlight-manager",
-	"version": "0.1.31",
+	"version": "0.1.32",
 	"description": "helper to navigate/highlight elements in a page based on a css selector",
 	"type": "module",
 	"exports": {
@@ -39,6 +39,6 @@
 		"wireit": "^0.14.13"
 	},
 	"dependencies": {
-		"html-vision": "^0.3.10"
+		"html-vision": "^1.0.5"
 	}
 }

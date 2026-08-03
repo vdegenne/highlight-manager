@@ -1,12 +1,11 @@
-import {querySelectorAll} from 'html-vision'
+import {$$} from 'html-vision/queries.js'
 import {
-	isInViewport,
 	scrollIntoView,
 	ScrollStrategy,
 	scrollStrategyDefaults,
-	sleep,
-	visibilityCheck,
-} from './utils.js'
+} from 'html-vision/scroll.js'
+import {isInViewport, visibilityCheck} from 'html-vision/visibility.js'
+import {sleep} from './utils.js'
 
 export interface HighlightInfo {
 	elements: HTMLElement[]
@@ -123,10 +122,26 @@ export class HighlightManager<T = {}> {
 
 	constructor(
 		protected selector: string,
-		options?: Partial<Options<T>>,
+		options?: Partial<
+			Omit<Options<T>, 'scrollStrategy'> & {
+				scrollStrategy: Options<T>['scrollStrategy'] | boolean
+			}
+		>,
 	) {
 		this.#id = highlighters.push(this)
-		this.#options = {...defaults, ...options}
+		this.#options = {
+			...defaults,
+			...options,
+			...(!options ||
+			!('scrollStrategy' in options) ||
+			(typeof options.scrollStrategy === 'boolean' &&
+				options.scrollStrategy === false)
+				? {scrollStrategy: undefined}
+				: typeof options.scrollStrategy === 'boolean' &&
+					  options.scrollStrategy === true
+					? {scrollStrategy: {}}
+					: {scrollStrategy: options.scrollStrategy}),
+		}
 
 		/* stylesheet */
 		this.#ss = new CSSStyleSheet()
@@ -181,7 +196,8 @@ export class HighlightManager<T = {}> {
 			const start = Date.now()
 
 			while (this.#highlightWhenAvailablePromiseWR === wr) {
-				const els = querySelectorAll(this.selector)
+				// TODO: should shadows be an class option ?
+				const els = $$(this.selector, {shadows: true})
 				const el = els[index]
 
 				if (el) {
@@ -230,7 +246,7 @@ export class HighlightManager<T = {}> {
 		options.internal ??= false
 
 		// console.log(this.selector)
-		const elements = querySelectorAll(this.selector).filter((el, i) =>
+		const elements = $$(this.selector, {shadows: true}).filter((el, i) =>
 			this.#options.atomicSelection(el, i),
 		)
 		const highlightElements = elements.filter((el) =>
