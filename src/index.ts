@@ -96,7 +96,7 @@ const defaults: Options<any> = {
 } // satisfies Omit<Options<any>, 'getInfoMiddleware'>
 
 // Local array of all declared highlighters for id control.
-const highlighters: HighLightManager<any>[] = []
+const highlighters: HighlightManager<any>[] = []
 
 let globalBeforeHighlight: (() => void) | undefined
 export function setGlobalBeforeHighlight(fct: () => void) {
@@ -114,7 +114,7 @@ interface HighlightOptions {
 	scrollStrategy?: Partial<ScrollStrategy> | undefined
 }
 
-export class HighLightManager<T = {}> {
+export class HighlightManager<T = {}> {
 	#options: Options<T>
 
 	#ss: CSSStyleSheet
@@ -584,5 +584,16 @@ export class HighLightManager<T = {}> {
 		this.highlight(elements.length - 1, elements.length - 1)
 	}
 }
+
+/**
+ * Deprecated alias, use `HighlightManager` instead
+ *
+ * dev note: It was a casing mistake.
+ *
+ * @deprecated
+ */
+export class HighLightManager<
+	TOptions = {},
+> extends HighlightManager<TOptions> {}
 
 export {ScrollStrategy}
