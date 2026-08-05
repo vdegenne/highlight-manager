@@ -23,7 +23,14 @@ export interface FastTravelOptions {
 	/**
 	 * @default (is) => is('partially-visible')
 	 */
-	toElementThat: CheckIf | CheckIf[]
+	toElementThat: CheckIf | CheckIf[] | undefined
+
+	/**
+	 * if `toElementThat` fails to find a candidate, use a fallback check
+	 *
+	 * @default (is) => is('partially-visible')
+	 */
+	fallback: CheckIf | undefined
 
 	/**
 	 * TODO: TO IMPLEMENT
@@ -67,7 +74,7 @@ interface Options<T = {}> {
 	 * If the current highlight is outside the viewport
 	 * and we navigate next
 	 *
-	 * @default undefined
+	 * @default default to FastTravelOptions default
 	 */
 	fastTravel: FastTravelOptions | undefined
 	/**
@@ -77,7 +84,7 @@ interface Options<T = {}> {
 	 *
 	 * @deprecated use `fastTravel` instead
 	 */
-	fullyVisibleFastTravel: boolean
+	// fullyVisibleFastTravel: boolean
 
 	/**
 	 * Whether to call .focus() on the newly highlighted element or not.
@@ -87,6 +94,11 @@ interface Options<T = {}> {
 	focusElementOnHighlight: boolean
 
 	getInfoMiddleware?: (info: HighlightInfo) => T
+}
+
+const fastTravelDefaults: FastTravelOptions = {
+	toElementThat: (is) => is('fully-visible'),
+	fallback: (is) => is('partially-visible'),
 }
 
 const defaults: Options<any> = {
@@ -104,8 +116,8 @@ const defaults: Options<any> = {
 	onSelectionChange: undefined,
 	applyStyleSheetTo: document,
 	scroll: undefined,
-	fastTravel: undefined,
-	fullyVisibleFastTravel: true,
+	fastTravel: fastTravelDefaults,
+	// fullyVisibleFastTravel: true,
 	focusElementOnHighlight: false,
 } // satisfies Omit<Options<any>, 'getInfoMiddleware'>
 
@@ -138,7 +150,7 @@ export class HighlightManager<T = {}> {
 	constructor(
 		protected selector: string,
 		options?: Partial<
-			Omit<Options<T>, 'scrollStrategy' | 'fastTravel'> & {
+			Omit<Options<T>, 'scroll' | 'fastTravel'> & {
 				scroll: Partial<Options<T>['scroll']> | boolean
 				fastTravel: Partial<Options<T>['fastTravel']> | boolean
 			}
@@ -160,7 +172,7 @@ export class HighlightManager<T = {}> {
 				? {fastTravel: undefined}
 				: {
 						fastTravel: {
-							toElementThat: (is) => is('partially-visible'),
+							...fastTravelDefaults,
 							...(options.fastTravel === true ? {} : options.fastTravel),
 						},
 					}),
@@ -413,6 +425,21 @@ export class HighlightManager<T = {}> {
 		})
 		let scrollStrategy = this.#options.scroll
 
+		let fastTravelChecks: CheckIf[] | undefined
+		if (this.#options.fastTravel) {
+			fastTravelChecks = this.#options.fastTravel.toElementThat
+				? Array.isArray(this.#options.fastTravel.toElementThat)
+					? this.#options.fastTravel.toElementThat
+					: [this.#options.fastTravel.toElementThat]
+				: []
+			if (this.#options.fastTravel.fallback) {
+				fastTravelChecks = [
+					...fastTravelChecks,
+					this.#options.fastTravel.fallback,
+				]
+			}
+		}
+
 		const len = elements.length
 		if (len === 0) {
 			this.highlight(-1)
@@ -425,15 +452,11 @@ export class HighlightManager<T = {}> {
 				: highlightIndexStart
 
 		if (currIndex === -1) {
-			if (this.#options.fastTravel) {
+			if (fastTravelChecks) {
 				const candidates = elements.reverse()
 				let found: HTMLElement | undefined
 
-				const checks = Array.isArray(this.#options.fastTravel.toElementThat)
-					? this.#options.fastTravel.toElementThat
-					: [this.#options.fastTravel.toElementThat]
-
-				for (const check of checks) {
+				for (const check of fastTravelChecks) {
 					found = candidates.find((el) => visibilityCheck(el, check))
 
 					if (found) {
@@ -445,15 +468,6 @@ export class HighlightManager<T = {}> {
 					const i = elements.indexOf(found)
 					this.highlight(i, i, {scroll: undefined})
 					return
-				}
-				// TODO: experimental, remove if it fails
-				else {
-					const found = candidates.find(isInViewport)
-					if (found) {
-						const i = elements.indexOf(found)
-						this.highlight(i, i, {scroll: undefined})
-						return
-					}
 				}
 			}
 
@@ -470,15 +484,11 @@ export class HighlightManager<T = {}> {
 
 		let prevIndex = -1
 
-		if (this.#options.fastTravel && !currIsVisible && currIsBelow) {
+		if (fastTravelChecks && !currIsVisible && currIsBelow) {
 			const candidates = elements.slice(0, currIndex).reverse()
 			let found: HTMLElement | undefined
 
-			const checks = Array.isArray(this.#options.fastTravel.toElementThat)
-				? this.#options.fastTravel.toElementThat
-				: [this.#options.fastTravel.toElementThat]
-
-			for (const check of checks) {
+			for (const check of fastTravelChecks) {
 				found = candidates.find((el) => visibilityCheck(el, check))
 
 				if (found) {
@@ -489,14 +499,6 @@ export class HighlightManager<T = {}> {
 			if (found) {
 				scrollStrategy = undefined
 				prevIndex = elements.indexOf(found)
-			}
-			// TODO: experimental, remove if it fails
-			else {
-				const found = candidates.find(isInViewport)
-				if (found) {
-					scrollStrategy = undefined
-					prevIndex = elements.indexOf(found)
-				}
 			}
 		}
 
@@ -515,6 +517,21 @@ export class HighlightManager<T = {}> {
 		})
 		let scrollStrategy = this.#options.scroll
 
+		let fastTravelChecks: CheckIf[] | undefined
+		if (this.#options.fastTravel) {
+			fastTravelChecks = this.#options.fastTravel.toElementThat
+				? Array.isArray(this.#options.fastTravel.toElementThat)
+					? this.#options.fastTravel.toElementThat
+					: [this.#options.fastTravel.toElementThat]
+				: []
+			if (this.#options.fastTravel.fallback) {
+				fastTravelChecks = [
+					...fastTravelChecks,
+					this.#options.fastTravel.fallback,
+				]
+			}
+		}
+
 		const len = elements.length
 		if (len === 0) {
 			this.highlight(-1)
@@ -527,14 +544,10 @@ export class HighlightManager<T = {}> {
 				: highlightIndexEnd
 
 		if (currIndex === -1) {
-			if (this.#options.fastTravel) {
+			if (fastTravelChecks) {
 				let found: HTMLElement | undefined
 
-				const checks = Array.isArray(this.#options.fastTravel.toElementThat)
-					? this.#options.fastTravel.toElementThat
-					: [this.#options.fastTravel.toElementThat]
-
-				for (const check of checks) {
+				for (const check of fastTravelChecks) {
 					found = elements.find((el) => visibilityCheck(el, check))
 
 					if (found) {
@@ -546,15 +559,6 @@ export class HighlightManager<T = {}> {
 					const i = elements.indexOf(found)
 					this.highlight(i, i, {scroll: undefined})
 					return
-				}
-				// TODO: experimental, remove if it fails
-				else {
-					const found = elements.find(isInViewport)
-					if (found) {
-						const i = elements.indexOf(found)
-						this.highlight(i, i, {scroll: undefined})
-						return
-					}
 				}
 			}
 
@@ -571,15 +575,11 @@ export class HighlightManager<T = {}> {
 
 		let nextIndex = -1
 
-		if (this.#options.fastTravel && !currIsVisible && currIsAbove) {
+		if (fastTravelChecks && !currIsVisible && currIsAbove) {
 			const candidates = elements.slice(currIndex + 1)
 			let found: HTMLElement | undefined
 
-			const checks = Array.isArray(this.#options.fastTravel.toElementThat)
-				? this.#options.fastTravel.toElementThat
-				: [this.#options.fastTravel.toElementThat]
-
-			for (const check of checks) {
+			for (const check of fastTravelChecks) {
 				found = candidates.find((el) => visibilityCheck(el, check))
 
 				if (found) {
@@ -590,14 +590,6 @@ export class HighlightManager<T = {}> {
 			if (found) {
 				scrollStrategy = undefined // Do not scroll
 				nextIndex = elements.indexOf(found)
-			}
-			// TODO: experimental, remove if it fails
-			else {
-				const found = candidates.find(isInViewport)
-				if (found) {
-					scrollStrategy = undefined // Do not scroll
-					nextIndex = elements.indexOf(found)
-				}
 			}
 		}
 
