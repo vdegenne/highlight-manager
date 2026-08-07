@@ -168,7 +168,7 @@ export class HighlightManager<T = {}> {
 							...(options.scroll === true ? {} : options.scroll),
 						},
 					}),
-			...(!options || !('fastTravel' in options) || options.fastTravel === false
+			...(!options || ('fastTravel' in options && options.fastTravel === false)
 				? {fastTravel: undefined}
 				: {
 						fastTravel: {
