@@ -74,7 +74,7 @@ interface Options<T = {}> {
 	 * If the current highlight is outside the viewport
 	 * and we navigate next
 	 *
-	 * @default default to FastTravelOptions default
+	 * @default Try to highlight fully visible element or partially visible element as a fallback
 	 */
 	fastTravel: FastTravelOptions | undefined
 	/**
