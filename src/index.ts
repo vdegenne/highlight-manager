@@ -645,6 +645,10 @@ export class HighlightManager<T = {}> {
 
 		this.highlight(elements.length - 1, elements.length - 1)
 	}
+
+	setLoop(value: boolean) {
+		this.#options.loop = value
+	}
 }
 
 /**
