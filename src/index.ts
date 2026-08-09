@@ -6,6 +6,7 @@ import {
 } from 'html-vision/scroll.js'
 import {CheckIf, isInViewport, visibilityCheck} from 'html-vision/visibility.js'
 import {Anchor, getClosestElement} from './relative-selection.js'
+import {hlm} from './types.js'
 import {sleep} from './utils.js'
 
 const fastTravelDefaults: hlm.FastTravelOptions = {
