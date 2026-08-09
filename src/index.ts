@@ -6,102 +6,14 @@ import {
 } from 'html-vision/scroll.js'
 import {CheckIf, isInViewport, visibilityCheck} from 'html-vision/visibility.js'
 import {sleep} from './utils.js'
+import {Anchor, getClosestElement} from './relative-selection.js'
 
-export interface HighlightInfo {
-	elements: HTMLElement[]
-	highlightIndexStart: number
-	highlightIndexEnd: number
-	highlightElements: HTMLElement[]
-	/**
-	 * First element of highlightElements if there is one
-	 */
-	highlightElement: HTMLElement | undefined
-	highlightContent: string | undefined
-}
-
-export interface FastTravelOptions {
-	/**
-	 * @default (is) => is('partially-visible')
-	 */
-	toElementThat: CheckIf | CheckIf[] | undefined
-
-	/**
-	 * if `toElementThat` fails to find a candidate, use a fallback check
-	 *
-	 * @default (is) => is('partially-visible')
-	 */
-	fallback: CheckIf | undefined
-
-	/**
-	 * TODO: TO IMPLEMENT
-	 */
-	bothWays?: boolean
-}
-
-interface Options<T = {}> {
-	css: string
-	highlightTextColor: string
-
-	/**
-	 * @default false
-	 */
-	loop: boolean
-	/**
-	 * A function for extra selection if selector is not enough
-	 * and need a way to filter elements based on properties.
-	 * Return false if you want to keep an element out of the bag.
-	 */
-	atomicSelection: (element: HTMLElement, i: number) => boolean
-	beforeHighlight: (() => void) | undefined
-	onSelectionChange: ((info: HighlightInfo) => void) | undefined
-
-	/**
-	 * By default the stylesheet for selection is applied to the main document.
-	 * Which means won't highlight elements in shadow doms.
-	 * You can target the element to give the stylesheet to.
-	 * If the given element has no shadow dom, it will fail silently.
-	 */
-	applyStyleSheetTo: Document | HTMLElement | ShadowRoot
-
-	/**
-	 * Set to at least `{}` to activate scrolling when offscreen
-	 *
-	 * @default undefined
-	 */
-	scroll: ScrollStrategy | undefined
-
-	/**
-	 * If the current highlight is outside the viewport
-	 * and we navigate next
-	 *
-	 * @default Try to highlight fully visible element or partially visible element as a fallback
-	 */
-	fastTravel: FastTravelOptions | undefined
-	/**
-	 * If true, the fast travel will select the first fully-visible elemnt in the view.
-	 *
-	 * @default true
-	 *
-	 * @deprecated use `fastTravel` instead
-	 */
-	// fullyVisibleFastTravel: boolean
-
-	/**
-	 * Whether to call .focus() on the newly highlighted element or not.
-	 *
-	 * @default false
-	 */
-	focusElementOnHighlight: boolean
-
-	getInfoMiddleware?: (info: HighlightInfo) => T
-}
-
-const fastTravelDefaults: FastTravelOptions = {
+const fastTravelDefaults: hlm.FastTravelOptions = {
 	toElementThat: (is) => is('fully-visible'),
 	fallback: (is) => is('partially-visible'),
 }
 
-const defaults: Options<any> = {
+const defaults: hlm.Options<any> = {
 	atomicSelection(_element) {
 		return true
 	},
@@ -111,6 +23,7 @@ const defaults: Options<any> = {
 	// css: 'background-color: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important',
 	// css: 'background-color: var(--md-sys-color-outline-variant) !important; color: var(--md-sys-color-on-surface) !important',
 	highlightTextColor: 'var(--md-sys-color-on-primary-container)',
+	navigationStyle: 'index-based',
 	loop: false,
 	beforeHighlight: undefined,
 	onSelectionChange: undefined,
@@ -129,19 +42,8 @@ export function setGlobalBeforeHighlight(fct: () => void) {
 	globalBeforeHighlight = fct
 }
 
-interface HighlightOptions {
-	/**
-	 * Should we unhighlight all highlighted elements before highlighting the next one
-	 *
-	 * @default true
-	 */
-	unhighlightAll: boolean
-
-	scroll?: Partial<ScrollStrategy> | undefined
-}
-
 export class HighlightManager<T = {}> {
-	#options: Options<T>
+	#options: hlm.Options<T>
 
 	#ss: CSSStyleSheet
 
@@ -150,9 +52,15 @@ export class HighlightManager<T = {}> {
 	constructor(
 		protected selector: string,
 		options?: Partial<
-			Omit<Options<T>, 'scroll' | 'fastTravel'> & {
-				scroll: Partial<Options<T>['scroll']> | boolean
-				fastTravel: Partial<Options<T>['fastTravel']> | boolean
+			Omit<hlm.Options<T>, 'scroll' | 'fastTravel'> & {
+				/**
+				 * @default false
+				 */
+				scroll: Partial<hlm.Options<T>['scroll']> | boolean
+				/**
+				 * @default true (will try to select the fully visible element first or partially visible fallback)
+				 */
+				fastTravel: Partial<hlm.Options<T>['fastTravel']> | boolean
 			}
 		>,
 	) {
@@ -277,7 +185,7 @@ export class HighlightManager<T = {}> {
 			 */
 			internal?: boolean
 		} = {},
-	): HighlightInfo & T {
+	): hlm.HighlightInfo & T {
 		options.internal ??= false
 
 		// console.log(this.selector)
@@ -315,7 +223,7 @@ export class HighlightManager<T = {}> {
 			.join('')
 		// highlightElement?.innerText.trim();
 
-		const base: HighlightInfo = {
+		const base: hlm.HighlightInfo = {
 			elements,
 			// highlightIndex,
 			highlightIndexStart,
@@ -354,9 +262,9 @@ export class HighlightManager<T = {}> {
 	highlight(
 		start: number,
 		end?: number,
-		options?: Partial<HighlightOptions>,
+		options?: Partial<hlm.HighlightOptions>,
 	): boolean {
-		const _options: HighlightOptions = {
+		const _options: hlm.HighlightOptions = {
 			unhighlightAll: true,
 			...options,
 		}
@@ -597,6 +505,240 @@ export class HighlightManager<T = {}> {
 			nextIndex = this.#options.loop
 				? (currIndex + step) % len
 				: Math.min(len - 1, currIndex + step)
+		}
+
+		this.highlight(nextIndex, nextIndex, {scroll: scrollStrategy})
+	}
+
+	top() {
+		if (this.#options.navigationStyle === 'index-based') {
+			console.warn(
+				'The "top" navigation method is not usable with "index-based" navigation style.',
+			)
+			return
+		}
+
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
+		let scrollStrategy = this.#options.scroll
+
+		let fastTravelChecks: CheckIf[] | undefined
+		if (this.#options.fastTravel) {
+			fastTravelChecks = this.#options.fastTravel.toElementThat
+				? Array.isArray(this.#options.fastTravel.toElementThat)
+					? this.#options.fastTravel.toElementThat
+					: [this.#options.fastTravel.toElementThat]
+				: []
+
+			if (this.#options.fastTravel.fallback) {
+				fastTravelChecks = [
+					...fastTravelChecks,
+					this.#options.fastTravel.fallback,
+				]
+			}
+		}
+
+		const len = elements.length
+		if (len === 0) {
+			this.highlight(-1)
+			return
+		}
+
+		const currIndex =
+			highlightIndexStart !== highlightIndexEnd
+				? highlightIndexStart
+				: highlightIndexEnd
+
+		if (currIndex === -1) {
+			if (fastTravelChecks) {
+				let found: HTMLElement | undefined
+
+				for (const check of fastTravelChecks) {
+					found = elements.find((el) => visibilityCheck(el, check))
+
+					if (found) {
+						break
+					}
+				}
+
+				if (found) {
+					const i = elements.indexOf(found)
+					this.highlight(i, i, {scroll: undefined})
+					return
+				}
+			}
+
+			this.highlight(0)
+			return
+		}
+
+		const currEl = elements[currIndex]
+		const currIsVisible = currEl ? isInViewport(currEl) : false
+
+		const currIsBelow = currEl
+			? currEl.getBoundingClientRect().top > window.innerHeight
+			: false
+
+		let nextIndex = -1
+
+		if (fastTravelChecks && !currIsVisible && currIsBelow) {
+			const candidates = elements.slice(0, currIndex).reverse()
+			let found: HTMLElement | undefined
+
+			for (const check of fastTravelChecks) {
+				found = candidates.find((el) => visibilityCheck(el, check))
+
+				if (found) {
+					break
+				}
+			}
+
+			if (found) {
+				scrollStrategy = undefined
+				nextIndex = elements.indexOf(found)
+			}
+		}
+
+		if (nextIndex === -1 && currEl) {
+			const currRect = currEl.getBoundingClientRect()
+
+			const candidates = elements.filter((el) => {
+				if (el === currEl) return false
+
+				const rect = el.getBoundingClientRect()
+
+				return rect.bottom <= currRect.top
+			})
+
+			const closest = getClosestElement(currEl, candidates, {
+				anchor: Anchor.TOP_CENTER,
+			})
+
+			if (closest) {
+				nextIndex = elements.indexOf(closest)
+			}
+		}
+
+		if (nextIndex === -1) {
+			nextIndex = this.#options.loop ? 0 : currIndex
+		}
+
+		this.highlight(nextIndex, nextIndex, {scroll: scrollStrategy})
+	}
+
+	bottom() {
+		if (this.#options.navigationStyle === 'index-based') {
+			console.warn(
+				'The "bottom" navigation method is not usable with "index-based" navigation style.',
+			)
+			return
+		}
+
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
+		let scrollStrategy = this.#options.scroll
+
+		let fastTravelChecks: CheckIf[] | undefined
+		if (this.#options.fastTravel) {
+			fastTravelChecks = this.#options.fastTravel.toElementThat
+				? Array.isArray(this.#options.fastTravel.toElementThat)
+					? this.#options.fastTravel.toElementThat
+					: [this.#options.fastTravel.toElementThat]
+				: []
+
+			if (this.#options.fastTravel.fallback) {
+				fastTravelChecks = [
+					...fastTravelChecks,
+					this.#options.fastTravel.fallback,
+				]
+			}
+		}
+
+		const len = elements.length
+		if (len === 0) {
+			this.highlight(-1)
+			return
+		}
+
+		const currIndex =
+			highlightIndexStart !== highlightIndexEnd
+				? highlightIndexEnd - 1
+				: highlightIndexEnd
+
+		if (currIndex === -1) {
+			if (fastTravelChecks) {
+				let found: HTMLElement | undefined
+
+				for (const check of fastTravelChecks) {
+					found = elements.find((el) => visibilityCheck(el, check))
+
+					if (found) {
+						break
+					}
+				}
+
+				if (found) {
+					const i = elements.indexOf(found)
+					this.highlight(i, i, {scroll: undefined})
+					return
+				}
+			}
+
+			this.highlight(0)
+			return
+		}
+
+		const currEl = elements[currIndex]
+		const currIsVisible = currEl ? isInViewport(currEl) : false
+
+		const currIsAbove = currEl
+			? currEl.getBoundingClientRect().bottom < 0
+			: false
+
+		let nextIndex = -1
+
+		if (fastTravelChecks && !currIsVisible && currIsAbove) {
+			const candidates = elements.slice(currIndex + 1)
+			let found: HTMLElement | undefined
+
+			for (const check of fastTravelChecks) {
+				found = candidates.find((el) => visibilityCheck(el, check))
+
+				if (found) {
+					break
+				}
+			}
+
+			if (found) {
+				scrollStrategy = undefined
+				nextIndex = elements.indexOf(found)
+			}
+		}
+
+		if (nextIndex === -1 && currEl) {
+			const currRect = currEl.getBoundingClientRect()
+
+			const candidates = elements.filter((el) => {
+				if (el === currEl) return false
+
+				const rect = el.getBoundingClientRect()
+
+				return rect.top >= currRect.bottom
+			})
+
+			const closest = getClosestElement(currEl, candidates, {
+				anchor: Anchor.BOTTOM_CENTER,
+			})
+
+			if (closest) {
+				nextIndex = elements.indexOf(closest)
+			}
+		}
+
+		if (nextIndex === -1) {
+			nextIndex = this.#options.loop ? len - 1 : currIndex
 		}
 
 		this.highlight(nextIndex, nextIndex, {scroll: scrollStrategy})
