@@ -13,5 +13,5 @@
 		"declarationMap": true,
 		"sourceMap": true
 	},
-	"include": ["./src/**/*", "./types.d.ts"]
+	"include": ["./src/**/*"]
 }
