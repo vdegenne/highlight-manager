@@ -5,8 +5,8 @@ import {
 	scrollStrategyDefaults,
 } from 'html-vision/scroll.js'
 import {CheckIf, isInViewport, visibilityCheck} from 'html-vision/visibility.js'
-import {sleep} from './utils.js'
 import {Anchor, getClosestElement} from './relative-selection.js'
+import {sleep} from './utils.js'
 
 const fastTravelDefaults: hlm.FastTravelOptions = {
 	toElementThat: (is) => is('fully-visible'),

@@ -1,6 +1,6 @@
 {
 	"name": "@vdegenne/highlight-manager",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"description": "helper to navigate/highlight elements in a page based on a css selector",
 	"type": "module",
 	"exports": {
@@ -17,8 +17,7 @@
 	"files": [
 		"lib/**",
 		"!lib/**/*.js.map",
-		"!lib/**/*.d.ts.map",
-		"./types.d.ts"
+		"!lib/**/*.d.ts.map"
 	],
 	"scripts": {
 		"build": "wireit"
