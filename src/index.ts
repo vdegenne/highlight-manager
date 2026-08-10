@@ -460,13 +460,10 @@ export class HighlightManager<T = {}> {
 		}
 
 		const currEl = elements[currIndex]!
+		const currIsVisible = isInViewport(currEl)
+		const currIsBelow = currEl.getBoundingClientRect().top > window.innerHeight
 
 		if (navigationStyle === 'index-based') {
-			const currIsVisible = isInViewport(currEl)
-
-			const currIsBelow =
-				currEl.getBoundingClientRect().top > window.innerHeight
-
 			let previousIndex = -1
 
 			if (fastTravelChecks && !currIsVisible && currIsBelow) {
@@ -502,7 +499,7 @@ export class HighlightManager<T = {}> {
 		const candidates = elements.slice(0, currIndex)
 		let closest: HTMLElement | undefined
 
-		if (fastTravelChecks) {
+		if (fastTravelChecks && !currIsVisible && currIsBelow) {
 			for (const check of fastTravelChecks) {
 				closest = getClosestElement(
 					currEl,
@@ -639,12 +636,10 @@ export class HighlightManager<T = {}> {
 		}
 
 		const currEl = elements[currIndex]!
+		const currIsVisible = isInViewport(currEl)
+		const currIsAbove = currEl.getBoundingClientRect().bottom < 0
 
 		if (navigationStyle === 'index-based') {
-			const currIsVisible = isInViewport(currEl)
-
-			const currIsAbove = currEl.getBoundingClientRect().bottom < 0
-
 			let nextIndex = -1
 
 			if (fastTravelChecks && !currIsVisible && currIsAbove) {
@@ -680,7 +675,7 @@ export class HighlightManager<T = {}> {
 		const candidates = elements.slice(currIndex + 1)
 		let closest: HTMLElement | undefined
 
-		if (fastTravelChecks) {
+		if (fastTravelChecks && !currIsVisible && currIsAbove) {
 			for (const check of fastTravelChecks) {
 				closest = getClosestElement(
 					currEl,
