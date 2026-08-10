@@ -499,11 +499,23 @@ export class HighlightManager<T = {}> {
 			return
 		}
 
-		const closest = getClosestElement(
-			currEl,
-			elements.slice(0, currIndex),
-			relativeOptions,
-		)
+		const candidates = elements.slice(0, currIndex)
+		let closest: HTMLElement | undefined
+
+		if (fastTravelChecks) {
+			for (const check of fastTravelChecks) {
+				closest = getClosestElement(
+					currEl,
+					candidates.filter((el) => visibilityCheck(el, check)),
+					relativeOptions,
+				)
+				if (closest) {
+					break
+				}
+			}
+		} else {
+			closest = getClosestElement(currEl, candidates, relativeOptions)
+		}
 
 		if (!closest) {
 			noRelativeCallback?.(this.getInfo({internal: true}))
@@ -665,11 +677,23 @@ export class HighlightManager<T = {}> {
 			return
 		}
 
-		const closest = getClosestElement(
-			currEl,
-			elements.slice(currIndex + 1),
-			relativeOptions,
-		)
+		const candidates = elements.slice(currIndex + 1)
+		let closest: HTMLElement | undefined
+
+		if (fastTravelChecks) {
+			for (const check of fastTravelChecks) {
+				closest = getClosestElement(
+					currEl,
+					candidates.filter((el) => visibilityCheck(el, check)),
+					relativeOptions,
+				)
+				if (closest) {
+					break
+				}
+			}
+		} else {
+			closest = getClosestElement(currEl, candidates, relativeOptions)
+		}
 
 		if (!closest) {
 			noRelativeCallback?.(this.getInfo({internal: true}))
