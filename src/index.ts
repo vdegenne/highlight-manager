@@ -79,7 +79,14 @@ export class HighlightManager<T = {}> {
 				 *
 				 * These options are merged with the defaults
 				 */
-				relativeOptions: Partial<Omit<GetClosestElementOptions, 'anchor'>>
+				relativeOptions: Partial<
+					Omit<GetClosestElementOptions, 'anchor' | 'dig'> & {
+						/**
+						 * These options are merged with the defaults
+						 */
+						dig: Partial<GetClosestElementOptions['dig']>
+					}
+				>
 			}
 		>,
 	) {
@@ -106,6 +113,10 @@ export class HighlightManager<T = {}> {
 			relativeOptions: {
 				...defaultRelativeOptions,
 				...(options?.relativeOptions ?? {}),
+				dig: {
+					...defaultRelativeOptions.dig,
+					...options?.relativeOptions?.dig,
+				},
 			},
 		}
 
@@ -496,7 +507,12 @@ export class HighlightManager<T = {}> {
 			return
 		}
 
-		const candidates = elements.slice(0, currIndex)
+		const alsoSelectXElementsAfter = 10 // you can tweak this
+		const candidates = elements.slice(
+			0,
+			currIndex + 1 + alsoSelectXElementsAfter,
+		)
+		// TODO: probably should exclude the element itself?
 		let closest: HTMLElement | undefined
 
 		if (fastTravelChecks && !currIsVisible && currIsBelow) {
@@ -504,7 +520,7 @@ export class HighlightManager<T = {}> {
 				closest = getClosestElement(
 					currEl,
 					candidates.filter((el) => visibilityCheck(el, check)),
-					relativeOptions,
+					{...relativeOptions},
 				)
 				if (closest) {
 					break
@@ -672,7 +688,11 @@ export class HighlightManager<T = {}> {
 			return
 		}
 
-		const candidates = elements.slice(currIndex + 1)
+		const alsoSelectXElementsBehind = 10 // you can tweak this
+		// TODO: probably should exclude the element itself?
+		const candidates = elements.slice(
+			Math.max(0, currIndex - alsoSelectXElementsBehind),
+		)
 		let closest: HTMLElement | undefined
 
 		if (fastTravelChecks && !currIsVisible && currIsAbove) {
@@ -702,7 +722,7 @@ export class HighlightManager<T = {}> {
 		})
 	}
 
-	top(options?: {
+	up(options?: {
 		/**
 		 * Navigation style to use for this call.
 		 *
@@ -738,7 +758,7 @@ export class HighlightManager<T = {}> {
 		})
 	}
 
-	bottom(options?: {
+	down(options?: {
 		/**
 		 * Navigation style to use for this call.
 		 *
@@ -834,5 +854,4 @@ export class HighLightManager<
 	TOptions = {},
 > extends HighlightManager<TOptions> {}
 
-export {ScrollStrategy}
-export {Anchor}
+export {Anchor, ScrollStrategy}

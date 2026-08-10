@@ -2,6 +2,12 @@ import type {ScrollStrategy} from 'html-vision/scroll.js'
 import type {CheckIf} from 'html-vision/visibility.js'
 import {GetClosestElementOptions} from './relative-selection.js'
 
+declare global {
+	type DeepPartial<T> = {
+		[P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+	}
+}
+
 export namespace hlm {
 	export interface HighlightInfo {
 		elements: HTMLElement[]

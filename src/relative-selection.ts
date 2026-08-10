@@ -36,6 +36,28 @@ export interface GetClosestElementOptions {
 	maxDistance: number
 
 	/**
+	 * Repeatedly increase the outer offset when no candidate is found.
+	 */
+	dig: {
+		/**
+		 * Number of searches to perform.
+		 *
+		 * @default 1
+		 */
+		count: number
+
+		/**
+		 * Distance in CSS pixels to add to the outer offset for each
+		 * additional search.
+		 *
+		 * `outerOffset` option overrides this value when set.
+		 *
+		 * @default 20
+		 */
+		step: number
+	}
+
+	/**
 	 * Visually display the calculated reference point for debugging.
 	 *
 	 * @default false
@@ -47,6 +69,7 @@ export const defaultRelativeOptions: GetClosestElementOptions = {
 	anchor: Anchor.CENTER,
 	outerOffset: 0,
 	maxDistance: Infinity,
+	dig: {count: 1, step: 20},
 	debug: false,
 }
 
@@ -111,80 +134,120 @@ function getAnchorOffset(anchor: Anchor): {
 export function getClosestElement<T extends Element>(
 	element: T,
 	elements: Iterable<T>,
-	options?: Partial<GetClosestElementOptions>,
+	options?: DeepPartial<GetClosestElementOptions> & {
+		/**
+		 * Use these values to override element rect values.
+		 *
+		 * This is particularly useful if you want to start finding elements
+		 * from another point in space. For example, when the new top should
+		 * be the top of the screen while the left and right remain coherent
+		 * with the current element's rect values.
+		 *
+		 * The provided values are merged with the element's rect values.
+		 */
+		fromRectOverride?: Partial<DOMRect>
+	},
 ): T | undefined {
-	const {anchor, outerOffset, maxDistance, debug} = {
+	const {anchor, outerOffset, maxDistance, dig, debug, fromRectOverride} = {
 		...defaultRelativeOptions,
 		...options,
+		dig: {
+			...defaultRelativeOptions.dig,
+			...options?.dig,
+		},
 	}
 
-	const rect = element.getBoundingClientRect()
+	const elementRect = element.getBoundingClientRect()
+	const rect = {
+		...elementRect,
+		...fromRectOverride,
+	}
+
 	const anchorPoint = getAnchorPoint(rect, anchor)
 	const anchorOffset = getAnchorOffset(anchor)
 
-	const referencePoint = {
-		x: anchorPoint.x + anchorOffset.x * outerOffset,
-		y: anchorPoint.y + anchorOffset.y * outerOffset,
-	}
+	const candidates = [...elements]
 
-	if (debug) {
-		console.log(referencePoint)
+	// DIG
+	for (let attempt = 0; attempt < dig.count; attempt++) {
+		const currentOuterOffset = outerOffset + (outerOffset || dig.step) * attempt
 
-		const debugPoint = document.createElement('div')
-
-		Object.assign(debugPoint.style, {
-			position: 'fixed',
-			left: `${referencePoint.x}px`,
-			top: `${referencePoint.y}px`,
-			width: '10px',
-			height: '10px',
-			borderRadius: '50%',
-			background: 'red',
-			transform: 'translate(-50%, -50%)',
-			zIndex: '999999',
-			pointerEvents: 'none',
-			transition: 'opacity 1s ease',
-		})
-
-		document.body.append(debugPoint)
-
-		function removeDebugPoint() {
-			debugPoint.remove()
-			window.removeEventListener('scroll', removeDebugPoint)
+		const referencePoint = {
+			x: anchorPoint.x + anchorOffset.x * currentOuterOffset,
+			y: anchorPoint.y + anchorOffset.y * currentOuterOffset,
 		}
 
-		window.addEventListener('scroll', removeDebugPoint, {once: true})
+		if (debug) {
+			console.log(referencePoint)
 
-		requestAnimationFrame(function () {
-			debugPoint.style.opacity = '0'
-		})
+			const debugPoint = document.createElement('div')
 
-		setTimeout(removeDebugPoint, 1000)
-	}
+			Object.assign(debugPoint.style, {
+				position: 'fixed',
+				left: `${referencePoint.x}px`,
+				top: `${referencePoint.y}px`,
+				width: '10px',
+				height: '10px',
+				borderRadius: '50%',
+				background: 'red',
+				transform: 'translate(-50%, -50%)',
+				zIndex: '999999',
+				pointerEvents: 'none',
+				transition: 'opacity 1s ease',
+			})
 
-	const maxDistanceSquared =
-		maxDistance === undefined ? Infinity : maxDistance * maxDistance
+			document.body.append(debugPoint)
 
-	let closestElement: T | undefined
-	let closestDistance = maxDistanceSquared
+			function removeDebugPoint() {
+				debugPoint.remove()
+				window.removeEventListener('scroll', removeDebugPoint)
+			}
 
-	for (const candidate of elements) {
-		if (candidate === element) continue
+			window.addEventListener('scroll', removeDebugPoint, {
+				once: true,
+			})
 
-		const rect = candidate.getBoundingClientRect()
+			requestAnimationFrame(function () {
+				debugPoint.style.opacity = '0'
+			})
 
-		const closestX = Math.max(rect.left, Math.min(referencePoint.x, rect.right))
-		const closestY = Math.max(rect.top, Math.min(referencePoint.y, rect.bottom))
+			setTimeout(removeDebugPoint, 1000)
+		}
 
-		const dx = referencePoint.x - closestX
-		const dy = referencePoint.y - closestY
-		const distance = dx * dx + dy * dy
+		const maxDistanceSquared =
+			maxDistance === undefined ? Infinity : maxDistance * maxDistance
 
-		if (distance < closestDistance) {
-			closestDistance = distance
-			closestElement = candidate
+		let closestElement: T | undefined
+		let closestDistance = maxDistanceSquared
+
+		for (const candidate of candidates) {
+			if (candidate === element) continue
+
+			const rect = candidate.getBoundingClientRect()
+
+			const closestX = Math.max(
+				rect.left,
+				Math.min(referencePoint.x, rect.right),
+			)
+			const closestY = Math.max(
+				rect.top,
+				Math.min(referencePoint.y, rect.bottom),
+			)
+
+			const dx = referencePoint.x - closestX
+			const dy = referencePoint.y - closestY
+			const distance = dx * dx + dy * dy
+
+			if (distance < closestDistance) {
+				closestDistance = distance
+				closestElement = candidate
+			}
+		}
+
+		if (closestElement) {
+			return closestElement
 		}
 	}
 
-	return closestElement
+	return undefined
 }
