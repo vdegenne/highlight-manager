@@ -455,15 +455,17 @@ export class HighlightManager<T = {}> {
 					found = elements.findLast((el) => visibilityCheck(el, check))
 
 					if (found) {
-						break
+						const i = elements.indexOf(found)
+						this.highlight(i, i, {scroll: undefined})
+						return
 					}
 				}
 
-				if (found) {
-					const i = elements.indexOf(found)
-					this.highlight(i, i, {scroll: undefined})
-					return
-				}
+				// if (found) {
+				// 	const i = elements.indexOf(found)
+				// 	this.highlight(i, i, {scroll: undefined})
+				// 	return
+				// }
 			}
 
 			this.highlight(this.#options.loop ? len - 1 : 0)
@@ -485,14 +487,16 @@ export class HighlightManager<T = {}> {
 					found = candidates.find((el) => visibilityCheck(el, check))
 
 					if (found) {
+						scrollStrategy = undefined
+						previousIndex = elements.indexOf(found)
 						break
 					}
 				}
 
-				if (found) {
-					scrollStrategy = undefined
-					previousIndex = elements.indexOf(found)
-				}
+				// if (found) {
+				// 	scrollStrategy = undefined
+				// 	previousIndex = elements.indexOf(found)
+				// }
 			}
 
 			if (previousIndex === -1) {
@@ -520,9 +524,14 @@ export class HighlightManager<T = {}> {
 				closest = getClosestElement(
 					currEl,
 					candidates.filter((el) => visibilityCheck(el, check)),
-					{...relativeOptions},
+					{
+						...relativeOptions,
+						fromRectOverride: {bottom: 0, top: -1},
+					},
 				)
+
 				if (closest) {
+					scrollStrategy = undefined
 					break
 				}
 			}
@@ -636,15 +645,17 @@ export class HighlightManager<T = {}> {
 					found = elements.find((el) => visibilityCheck(el, check))
 
 					if (found) {
+						const i = elements.indexOf(found)
+						this.highlight(i, i, {scroll: undefined})
 						break
 					}
 				}
 
-				if (found) {
-					const i = elements.indexOf(found)
-					this.highlight(i, i, {scroll: undefined})
-					return
-				}
+				// if (found) {
+				// 	const i = elements.indexOf(found)
+				// 	this.highlight(i, i, {scroll: undefined})
+				// 	return
+				// }
 			}
 
 			this.highlight(0)
@@ -666,14 +677,16 @@ export class HighlightManager<T = {}> {
 					found = candidates.find((el) => visibilityCheck(el, check))
 
 					if (found) {
+						scrollStrategy = undefined
+						nextIndex = elements.indexOf(found)
 						break
 					}
 				}
 
-				if (found) {
-					scrollStrategy = undefined
-					nextIndex = elements.indexOf(found)
-				}
+				// if (found) {
+				// 	scrollStrategy = undefined
+				// 	nextIndex = elements.indexOf(found)
+				// }
 			}
 
 			if (nextIndex === -1) {
@@ -700,9 +713,17 @@ export class HighlightManager<T = {}> {
 				closest = getClosestElement(
 					currEl,
 					candidates.filter((el) => visibilityCheck(el, check)),
-					relativeOptions,
+					{
+						...relativeOptions,
+						fromRectOverride: {
+							top: 0,
+							bottom: 1,
+						},
+					},
 				)
+
 				if (closest) {
+					scrollStrategy = undefined
 					break
 				}
 			}

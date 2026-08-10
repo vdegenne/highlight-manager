@@ -134,19 +134,26 @@ function getAnchorOffset(anchor: Anchor): {
 export function getClosestElement<T extends Element>(
 	element: T,
 	elements: Iterable<T>,
-	options?: DeepPartial<GetClosestElementOptions> & {
-		/**
-		 * Use these values to override element rect values.
-		 *
-		 * This is particularly useful if you want to start finding elements
-		 * from another point in space. For example, when the new top should
-		 * be the top of the screen while the left and right remain coherent
-		 * with the current element's rect values.
-		 *
-		 * The provided values are merged with the element's rect values.
-		 */
-		fromRectOverride?: Partial<DOMRect>
-	},
+	options?: DeepPartial<
+		GetClosestElementOptions & {
+			/**
+			 * Use these values to override element rect values.
+			 *
+			 * This is particularly useful if you want to start finding elements
+			 * from another point in space. For example, when the new top should
+			 * be the top of the screen while the left and right remain coherent
+			 * with the current element's rect values.
+			 *
+			 * The provided values are merged with the element's rect values.
+			 */
+			fromRectOverride: {
+				left: number
+				right: number
+				top: number
+				bottom: number
+			}
+		}
+	>,
 ): T | undefined {
 	const {anchor, outerOffset, maxDistance, dig, debug, fromRectOverride} = {
 		...defaultRelativeOptions,
@@ -157,11 +164,20 @@ export function getClosestElement<T extends Element>(
 		},
 	}
 
+	/*
+	 * Note: DOMRect's values are relative to the viewport not the entire document.
+	 *		`left` and `top` are typically aliases for `x` and `y`.
+	 */
 	const elementRect = element.getBoundingClientRect()
-	const rect = {
-		...elementRect,
-		...fromRectOverride,
-	}
+	// console.clear()
+	// console.log(JSON.stringify(elementRect, null, 2))
+
+	const left = fromRectOverride?.left ?? elementRect.left
+	const top = fromRectOverride?.top ?? elementRect.top
+	const right = fromRectOverride?.right ?? elementRect.right
+	const bottom = fromRectOverride?.bottom ?? elementRect.bottom
+
+	const rect = new DOMRect(left, top, right - left, bottom - top)
 
 	const anchorPoint = getAnchorPoint(rect, anchor)
 	const anchorOffset = getAnchorOffset(anchor)
@@ -196,22 +212,39 @@ export function getClosestElement<T extends Element>(
 				transition: 'opacity 1s ease',
 			})
 
-			document.body.append(debugPoint)
+			const debugRect = document.createElement('div')
 
-			function removeDebugPoint() {
+			Object.assign(debugRect.style, {
+				position: 'fixed',
+				left: `${rect.left}px`,
+				top: `${rect.top}px`,
+				width: `${rect.width}px`,
+				height: `${rect.height}px`,
+				border: '2px solid yellow',
+				boxSizing: 'border-box',
+				zIndex: '999998',
+				pointerEvents: 'none',
+				transition: 'opacity 1s ease',
+			})
+
+			document.body.append(debugRect, debugPoint)
+
+			function removeDebug() {
 				debugPoint.remove()
-				window.removeEventListener('scroll', removeDebugPoint)
+				debugRect.remove()
+				window.removeEventListener('scroll', removeDebug)
 			}
 
-			window.addEventListener('scroll', removeDebugPoint, {
+			window.addEventListener('scroll', removeDebug, {
 				once: true,
 			})
 
 			requestAnimationFrame(function () {
 				debugPoint.style.opacity = '0'
+				debugRect.style.opacity = '0'
 			})
 
-			setTimeout(removeDebugPoint, 1000)
+			setTimeout(removeDebug, 1500)
 		}
 
 		const maxDistanceSquared =
