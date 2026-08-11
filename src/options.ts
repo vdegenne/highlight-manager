@@ -41,6 +41,13 @@ export interface Options<T = {}> {
 	relativeOptions: Partial<Omit<GetClosestElementOptions, 'anchor'>>
 
 	/**
+	 * Should the highlight go back at the beginning when we reach the end?
+	 *
+	 * This option only makes sense in "index-based" mode,
+	 * You can use `noRelativeCallback` in "relative-to" mode
+	 *	to implement your own loop logic when selecting a relative element is considered stale.
+	 *	e.g. "highlighter.highlight(0) when overreaching the last line."
+	 *
 	 * @default false
 	 */
 	loop: boolean

@@ -58,6 +58,8 @@ export interface GetClosestElementOptions {
 		/**
 		 * Number of searches to perform.
 		 *
+		 * `untilOffscreen` completely overrides the dig count when set.
+		 *
 		 * @default 1
 		 */
 		count: number
@@ -66,9 +68,10 @@ export interface GetClosestElementOptions {
 		 * Distance in CSS pixels to add to the outer offset for each
 		 * additional search.
 		 *
-		 * `outerOffset` option overrides this value when set.
+		 * If this value is not set, the dig will use `outerOffset` instead.
+		 * If both values are 0 or undefined, the dig will throw.
 		 *
-		 * @default 20
+		 * @default 0
 		 */
 		step: number
 
@@ -94,7 +97,7 @@ export const defaultRelativeOptions: GetClosestElementOptions = {
 	anchor: Anchor.CENTER,
 	outerOffset: 0,
 	maxDistance: Infinity,
-	dig: {count: 1, step: 20, untilOffscreen: false},
+	dig: {count: 1, step: 0, untilOffscreen: false},
 	debug: false,
 }
 
@@ -189,9 +192,13 @@ export function getClosestElement<T extends Element>(
 		},
 	}
 
-	if (dig.untilOffscreen && outerOffset === 0 && dig.step === 0) {
+	if (
+		(dig.untilOffscreen || dig.count > 2) &&
+		outerOffset === 0 &&
+		dig.step === 0
+	) {
 		throw new Error(
-			'`dig.untilOffscreen` requires `outerOffset` or `dig.step` to be greater than 0.',
+			'When digging, at least `dig.step` OR `outerOffset` needs to be greater than 0.',
 		)
 	}
 
@@ -216,7 +223,7 @@ export function getClosestElement<T extends Element>(
 	// DIG
 	let attempt = 0
 	for (attempt = 0; dig.untilOffscreen || attempt < dig.count; attempt++) {
-		const currentOuterOffset = outerOffset + (outerOffset || dig.step) * attempt
+		const currentOuterOffset = outerOffset + (dig.step || outerOffset) * attempt
 
 		const referencePoint = {
 			x: anchorPoint.x + anchorOffset.x * currentOuterOffset,

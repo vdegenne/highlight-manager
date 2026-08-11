@@ -1,7 +1,7 @@
 import {$$} from 'html-vision/queries.js'
 import {scrollIntoView, ScrollStrategy} from 'html-vision/scroll.js'
 import {CheckIf, isInViewport, visibilityCheck} from 'html-vision/visibility.js'
-import {fastTravelDefaults, FastTravelOptions} from './fast-travel.js'
+import {fastTravelDefaults} from './fast-travel.js'
 import {
 	defaultOptions,
 	mergeOptions,
@@ -528,60 +528,61 @@ export class HighlightManager<T = {}> {
 	 * It uses the navigation style you set in the global options
 	 * unless you override it here.
 	 */
-	next(options?: DeepPartial<MotionOptions>) {
-		// const opt: MotionOptions = {
-		// 	...options,
-		// 	navigationStyle:
-		// 		options?.navigationStyle ?? this.#options.navigationStyle,
-		// 	step: options?.step ?? 1,
+	next(motionOptions?: DeepPartial<MotionOptions>) {
+		const options: MotionOptions = {
+			...motionOptions,
+			navigationStyle:
+				motionOptions?.navigationStyle ?? this.#options.navigationStyle,
+			step: motionOptions?.step ?? 1,
+
+			fastTravel: {
+				...fastTravelDefaults,
+				...this.#options.fastTravel,
+				...motionOptions?.fastTravel,
+			},
+
+			relativeOptions: {
+				...defaultRelativeOptions,
+				...this.#options.relativeOptions,
+				anchor: Anchor.CENTER_RIGHT,
+				...motionOptions?.relativeOptions,
+				dig: {
+					...defaultRelativeOptions.dig,
+					...this.#options.relativeOptions.dig,
+					...motionOptions?.relativeOptions?.dig,
+				},
+			},
+
+			noRelativeCallback: motionOptions?.noRelativeCallback,
+		}
+
+		// const {
+		// 	navigationStyle = this.#options.navigationStyle,
+		// 	step = 1,
+		// 	noRelativeCallback,
+		// } = options ?? {}
 		//
-		// 	fastTravel: {
-		// 		...fastTravelDefaults,
-		// 		...this.#options.fastTravel,
-		// 		...options?.fastTravel,
+		// const relativeOptions: GetClosestElementOptions = {
+		// 	...defaultRelativeOptions,
+		// 	...this.#options.relativeOptions,
+		// 	anchor: Anchor.CENTER_RIGHT,
+		// 	...options?.relativeOptions,
+		// 	dig: {
+		// 		...defaultRelativeOptions.dig,
+		// 		...this.#options.relativeOptions.dig,
+		// 		...options?.relativeOptions?.dig,
 		// 	},
+		// }
 		//
-		// 	relativeOptions: {
-		// 		...defaultRelativeOptions,
-		// 		...this.#options.relativeOptions,
-		// 		anchor: Anchor.CENTER_RIGHT,
-		// 		...options?.relativeOptions,
-		// 		dig: {
-		// 			...defaultRelativeOptions.dig,
-		// 			...this.#options.relativeOptions.dig,
-		// 			...options?.relativeOptions?.dig,
-		// 		},
-		// 	},
-		//
-		// 	noRelativeCallback: options?.noRelativeCallback,
+		// // TODO: should prob turn this into undefined if explicitely not provided
+		// const fastTravel: FastTravelOptions = {
+		// 	...fastTravelDefaults,
+		// 	...this.#options.fastTravel,
+		// 	...options?.fastTravel,
 		// }
 
-		const {
-			navigationStyle = this.#options.navigationStyle,
-			step = 1,
-			noRelativeCallback,
-		} = options ?? {}
-
-		const relativeOptions: GetClosestElementOptions = {
-			...defaultRelativeOptions,
-			...this.#options.relativeOptions,
-			anchor: Anchor.CENTER_RIGHT,
-			...options?.relativeOptions,
-			dig: {
-				...defaultRelativeOptions.dig,
-				...this.#options.relativeOptions.dig,
-				...options?.relativeOptions?.dig,
-			},
-		}
-
-		// TODO: should prob turn this into undefined if explicitely not provided
-		const fastTravel: FastTravelOptions = {
-			...fastTravelDefaults,
-			...this.#options.fastTravel,
-			...options?.fastTravel,
-		}
-
-		if (relativeOptions.debug) {
+		if (options.relativeOptions.debug) {
+			// console.log(options)
 			// console.log({
 			// 	navigationStyle,
 			// 	step,
@@ -598,15 +599,15 @@ export class HighlightManager<T = {}> {
 		let scrollStrategy = this.#options.scroll
 
 		let fastTravelChecks: CheckIf[] | undefined
-		if (fastTravel) {
-			fastTravelChecks = fastTravel.toElementThat
-				? Array.isArray(fastTravel.toElementThat)
-					? fastTravel.toElementThat
-					: [fastTravel.toElementThat]
+		if (options.fastTravel) {
+			fastTravelChecks = options.fastTravel.toElementThat
+				? Array.isArray(options.fastTravel.toElementThat)
+					? options.fastTravel.toElementThat
+					: [options.fastTravel.toElementThat]
 				: []
 
-			if (fastTravel.fallback) {
-				fastTravelChecks = [...fastTravelChecks, fastTravel.fallback]
+			if (options.fastTravel.fallback) {
+				fastTravelChecks = [...fastTravelChecks, options.fastTravel.fallback]
 			}
 		}
 
@@ -657,26 +658,29 @@ export class HighlightManager<T = {}> {
 		const currIsBeforeScreen = currRect.right < 0
 		const currIsBelowScreen = currRect.top > window.innerHeight
 		const currIsAfterScreen = currRect.left > window.innerWidth
-		const currAnchorPoint = getAnchorPoint(currRect, relativeOptions.anchor)
+		const currAnchorPoint = getAnchorPoint(
+			currRect,
+			options.relativeOptions.anchor,
+		)
 
 		let shouldFastTravel =
-			fastTravel &&
+			options.fastTravel &&
 			!currIsVisible &&
 			(currIsAboveScreen || (currIsBeforeScreen && !currIsBelowScreen))
 
 		if (
-			navigationStyle === 'index-based' ||
+			options.navigationStyle === 'index-based' ||
 			// That's for delegating the fast travel to index-based when it is unecessary to use relative motion
-			(navigationStyle === 'relative-to' &&
+			(options.navigationStyle === 'relative-to' &&
 				shouldFastTravel &&
-				fastTravel!.relativeResolution ===
+				options.fastTravel!.relativeResolution ===
 					RelativeResolution.INDEX_BASED_FALLBACK &&
 				!(currAnchorPoint.y > 0 && currAnchorPoint.y < window.innerHeight))
 		) {
 			let nextIndex = -1
 
 			if (shouldFastTravel) {
-				if (relativeOptions.debug) {
+				if (options.relativeOptions.debug) {
 					console.log('DELEGATING FAST TRAVEL TO INDEX-BASED')
 				}
 				const candidates = elements.slice(currIndex + 1)
@@ -700,8 +704,8 @@ export class HighlightManager<T = {}> {
 
 			if (nextIndex === -1) {
 				nextIndex = this.#options.loop
-					? (currIndex + step) % len
-					: Math.min(len - 1, currIndex + step)
+					? (currIndex + options.step) % len
+					: Math.min(len - 1, currIndex + options.step)
 			}
 
 			this.highlight(nextIndex, nextIndex, {
@@ -718,7 +722,7 @@ export class HighlightManager<T = {}> {
 		let closest: HTMLElement | undefined
 
 		if (shouldFastTravel) {
-			switch (fastTravel!.relativeResolution) {
+			switch (options.fastTravel!.relativeResolution) {
 				case RelativeResolution.INDEX_BASED_FALLBACK:
 					break
 				case RelativeResolution.CLOSEST:
@@ -727,7 +731,7 @@ export class HighlightManager<T = {}> {
 							currEl,
 							candidates.filter((el) => visibilityCheck(el, check)),
 							{
-								...relativeOptions,
+								...options.relativeOptions,
 								fromRectOverride: {
 									left: 0,
 									right: 10,
@@ -744,11 +748,11 @@ export class HighlightManager<T = {}> {
 					break
 			}
 		} else {
-			closest = getClosestElement(currEl, candidates, relativeOptions)
+			closest = getClosestElement(currEl, candidates, options.relativeOptions)
 		}
 
 		if (!closest) {
-			noRelativeCallback?.(this.getInfo({internal: true}))
+			options.noRelativeCallback?.(this.getInfo({internal: true}))
 			return
 		}
 
