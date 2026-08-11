@@ -1,44 +1,32 @@
 import {$$} from 'html-vision/queries.js'
-import {
-	scrollIntoView,
-	ScrollStrategy,
-	scrollStrategyDefaults,
-} from 'html-vision/scroll.js'
+import {scrollIntoView, ScrollStrategy} from 'html-vision/scroll.js'
 import {CheckIf, isInViewport, visibilityCheck} from 'html-vision/visibility.js'
+import {fastTravelDefaults, FastTravelOptions} from './fast-travel.js'
+import {
+	defaultOptions,
+	mergeOptions,
+	MotionOptions,
+	Options,
+	OptionsInput,
+} from './options.js'
 import {
 	Anchor,
 	defaultRelativeOptions,
+	getAnchorPoint,
 	getClosestElement,
 	GetClosestElementOptions,
+	RelativeResolution,
 } from './relative-selection.js'
-import {hlm} from './types.js'
 import {sleep} from './utils.js'
 
-const fastTravelDefaults: hlm.FastTravelOptions = {
-	toElementThat: (is) => is('fully-visible'),
-	fallback: (is) => is('partially-visible'),
+declare global {
+	type DeepPartial<T> = {
+		[P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+	}
+	type DeepRequired<T> = {
+		[P in keyof T]-?: T[P] extends object ? DeepRequired<T[P]> : T[P]
+	}
 }
-
-const defaults: hlm.Options<any> = {
-	atomicSelection(_element) {
-		return true
-	},
-	// css: 'background-color: #cddc39a1 !important; color: black !important',
-	// css: 'background-color: var(--md-sys-color-surface-container-highest) !important; color: var(--md-sys-color-on-surface) !important',
-	css: 'background-color: var(--md-sys-color-primary-container) !important; color: var(--md-sys-color-on-primary-container) !important',
-	// css: 'background-color: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important',
-	// css: 'background-color: var(--md-sys-color-outline-variant) !important; color: var(--md-sys-color-on-surface) !important',
-	highlightTextColor: 'var(--md-sys-color-on-primary-container)',
-	navigationStyle: 'index-based',
-	relativeOptions: defaultRelativeOptions,
-	loop: false,
-	beforeHighlight: undefined,
-	onSelectionChange: undefined,
-	applyStyleSheetTo: document,
-	scroll: undefined,
-	fastTravel: fastTravelDefaults,
-	focusElementOnHighlight: false,
-} // satisfies Omit<Options<any>, 'getInfoMiddleware'>
 
 // Local array of all declared highlighters for id control.
 const highlighters: HighlightManager<any>[] = []
@@ -48,8 +36,38 @@ export function setGlobalBeforeHighlight(fct: () => void) {
 	globalBeforeHighlight = fct
 }
 
+export type NavigationStyle =
+	| 'index-based'
+	/**
+	 * Experimental
+	 */
+	| 'relative-to'
+
+export interface HighlightInfo {
+	elements: HTMLElement[]
+	highlightIndexStart: number
+	highlightIndexEnd: number
+	highlightElements: HTMLElement[]
+	/**
+	 * First element of highlightElements if there is one
+	 */
+	highlightElement: HTMLElement | undefined
+	highlightContent: string | undefined
+}
+
+export interface HighlightOptions {
+	/**
+	 * Should we unhighlight all highlighted elements before highlighting the next one
+	 *
+	 * @default true
+	 */
+	unhighlightAll: boolean
+
+	scroll?: Partial<ScrollStrategy> | undefined
+}
+
 export class HighlightManager<T = {}> {
-	#options: hlm.Options<T>
+	#options: Options<T>
 
 	#ss: CSSStyleSheet
 
@@ -57,68 +75,12 @@ export class HighlightManager<T = {}> {
 
 	constructor(
 		protected selector: string,
-		options?: Partial<
-			Omit<hlm.Options<T>, 'scroll' | 'fastTravel' | 'relativeOptions'> & {
-				/**
-				 * These options are merged with the defaults.
-				 * Set to `true` to use all defaults.
-				 *
-				 * @default false
-				 */
-				scroll: Partial<hlm.Options<T>['scroll']> | boolean
-				/**
-				 * These options are merged with the defaults.
-				 * Set to `true` to use all defaults.
-				 *
-				 * @default true
-				 */
-				fastTravel: Partial<hlm.Options<T>['fastTravel']> | boolean
-
-				/**
-				 * Global options to use in "relative-to" mode.
-				 *
-				 * These options are merged with the defaults
-				 */
-				relativeOptions: Partial<
-					Omit<GetClosestElementOptions, 'anchor' | 'dig'> & {
-						/**
-						 * These options are merged with the defaults
-						 */
-						dig: Partial<GetClosestElementOptions['dig']>
-					}
-				>
-			}
-		>,
+		options?: OptionsInput<T>,
 	) {
 		this.#id = highlighters.push(this)
-		this.#options = {
-			...defaults,
-			...options,
-			...(!options || !('scroll' in options) || options.scroll === false
-				? {scroll: undefined}
-				: {
-						scroll: {
-							...scrollStrategyDefaults,
-							...(options.scroll === true ? {} : options.scroll),
-						},
-					}),
-			...(!options || ('fastTravel' in options && options.fastTravel === false)
-				? {fastTravel: undefined}
-				: {
-						fastTravel: {
-							...fastTravelDefaults,
-							...(options.fastTravel === true ? {} : options.fastTravel),
-						},
-					}),
-			relativeOptions: {
-				...defaultRelativeOptions,
-				...(options?.relativeOptions ?? {}),
-				dig: {
-					...defaultRelativeOptions.dig,
-					...options?.relativeOptions?.dig,
-				},
-			},
-		}
+
+		this.#options = mergeOptions(defaultOptions, options)
+		console.log(this.#options)
 
 		/* stylesheet */
 		this.#ss = new CSSStyleSheet()
@@ -135,13 +97,6 @@ export class HighlightManager<T = {}> {
 		applyTo.adoptedStyleSheets.push(this.#ss)
 		// this.#ss.replaceSync(`[highlight] {${css}}`);
 		this.replaceCSS(this.#options.css)
-
-		// if (this.#options.scroll) {
-		// 	this.#options.scroll = {
-		// 		...scrollStrategyDefaults,
-		// 		...this.#options.scroll,
-		// 	}
-		// }
 	}
 
 	replaceCSS(css: string) {
@@ -219,7 +174,7 @@ export class HighlightManager<T = {}> {
 			 */
 			internal?: boolean
 		} = {},
-	): hlm.HighlightInfo & T {
+	): HighlightInfo & T {
 		options.internal ??= false
 
 		// console.log(this.selector)
@@ -257,7 +212,7 @@ export class HighlightManager<T = {}> {
 			.join('')
 		// highlightElement?.innerText.trim();
 
-		const base: hlm.HighlightInfo = {
+		const base: HighlightInfo = {
 			elements,
 			// highlightIndex,
 			highlightIndexStart,
@@ -296,9 +251,9 @@ export class HighlightManager<T = {}> {
 	highlight(
 		start: number,
 		end?: number,
-		options?: Partial<hlm.HighlightOptions>,
+		options?: Partial<HighlightOptions>,
 	): boolean {
-		const _options: hlm.HighlightOptions = {
+		const _options: HighlightOptions = {
 			unhighlightAll: true,
 			...options,
 		}
@@ -385,14 +340,24 @@ export class HighlightManager<T = {}> {
 		/**
 		 * Only for "relative-to" mode.
 		 */
-		relativeOptions?: Partial<GetClosestElementOptions>
+		relativeOptions?: Partial<
+			Omit<GetClosestElementOptions, 'anchor'> & {
+				/**
+				 * Anchor point of the reference element from which to calculate the
+				 * distance to candidate elements.
+				 *
+				 * @default Anchor.CENTER_LEFT
+				 */
+				anchor: Anchor
+			}
+		>
 
 		/**
 		 * Only for "relative-to" mode.
 		 *
 		 * A callback to execute in case no relative element was found.
 		 */
-		noRelativeCallback?: (info: hlm.HighlightInfo) => void
+		noRelativeCallback?: (info: HighlightInfo) => void
 	}) {
 		const {
 			navigationStyle = this.#options.navigationStyle,
@@ -474,12 +439,14 @@ export class HighlightManager<T = {}> {
 
 		const currEl = elements[currIndex]!
 		const currIsVisible = isInViewport(currEl)
-		const currIsBelow = currEl.getBoundingClientRect().top > window.innerHeight
+		const currRect = currEl.getBoundingClientRect()
+		const currIsBelowOrAfter =
+			currRect.top > window.innerHeight || currRect.left > window.innerWidth
 
 		if (navigationStyle === 'index-based') {
 			let previousIndex = -1
 
-			if (fastTravelChecks && !currIsVisible && currIsBelow) {
+			if (fastTravelChecks && !currIsVisible && currIsBelowOrAfter) {
 				const candidates = elements.slice(0, currIndex).reverse()
 				let found: HTMLElement | undefined
 
@@ -519,14 +486,18 @@ export class HighlightManager<T = {}> {
 		// TODO: probably should exclude the element itself?
 		let closest: HTMLElement | undefined
 
-		if (fastTravelChecks && !currIsVisible && currIsBelow) {
+		if (fastTravelChecks && !currIsVisible && currIsBelowOrAfter) {
 			for (const check of fastTravelChecks) {
 				closest = getClosestElement(
 					currEl,
 					candidates.filter((el) => visibilityCheck(el, check)),
 					{
 						...relativeOptions,
-						fromRectOverride: {bottom: 0, top: -1},
+						fromRectOverride: {
+							left: window.innerWidth - 10,
+							right: window.innerWidth,
+						},
+						// TODO: set the dig
 					},
 				)
 
@@ -557,33 +528,34 @@ export class HighlightManager<T = {}> {
 	 * It uses the navigation style you set in the global options
 	 * unless you override it here.
 	 */
-	next(options?: {
-		/**
-		 * Navigation style to use for this call.
-		 *
-		 * @default this.#options.navigationStyle
-		 */
-		navigationStyle?: 'index-based' | 'relative-to'
+	next(options?: DeepPartial<MotionOptions>) {
+		// const opt: MotionOptions = {
+		// 	...options,
+		// 	navigationStyle:
+		// 		options?.navigationStyle ?? this.#options.navigationStyle,
+		// 	step: options?.step ?? 1,
+		//
+		// 	fastTravel: {
+		// 		...fastTravelDefaults,
+		// 		...this.#options.fastTravel,
+		// 		...options?.fastTravel,
+		// 	},
+		//
+		// 	relativeOptions: {
+		// 		...defaultRelativeOptions,
+		// 		...this.#options.relativeOptions,
+		// 		anchor: Anchor.CENTER_RIGHT,
+		// 		...options?.relativeOptions,
+		// 		dig: {
+		// 			...defaultRelativeOptions.dig,
+		// 			...this.#options.relativeOptions.dig,
+		// 			...options?.relativeOptions?.dig,
+		// 		},
+		// 	},
+		//
+		// 	noRelativeCallback: options?.noRelativeCallback,
+		// }
 
-		/**
-		 * Only for "index-based" mode.
-		 *
-		 * @default 1
-		 */
-		step?: number
-
-		/**
-		 * Only for "relative-to" mode.
-		 */
-		relativeOptions?: Partial<GetClosestElementOptions>
-
-		/**
-		 * Only for "relative-to" mode.
-		 *
-		 * A callback to execute in case no relative element was found.
-		 */
-		noRelativeCallback?: (info: hlm.HighlightInfo) => void
-	}) {
 		const {
 			navigationStyle = this.#options.navigationStyle,
 			step = 1,
@@ -595,9 +567,28 @@ export class HighlightManager<T = {}> {
 			...this.#options.relativeOptions,
 			anchor: Anchor.CENTER_RIGHT,
 			...options?.relativeOptions,
+			dig: {
+				...defaultRelativeOptions.dig,
+				...this.#options.relativeOptions.dig,
+				...options?.relativeOptions?.dig,
+			},
 		}
+
+		// TODO: should prob turn this into undefined if explicitely not provided
+		const fastTravel: FastTravelOptions = {
+			...fastTravelDefaults,
+			...this.#options.fastTravel,
+			...options?.fastTravel,
+		}
+
 		if (relativeOptions.debug) {
-			console.log(relativeOptions)
+			// console.log({
+			// 	navigationStyle,
+			// 	step,
+			// 	noRelativeCallback,
+			// 	relativeOptions,
+			// 	fastTravel,
+			// })
 		}
 
 		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
@@ -607,18 +598,15 @@ export class HighlightManager<T = {}> {
 		let scrollStrategy = this.#options.scroll
 
 		let fastTravelChecks: CheckIf[] | undefined
-		if (this.#options.fastTravel) {
-			fastTravelChecks = this.#options.fastTravel.toElementThat
-				? Array.isArray(this.#options.fastTravel.toElementThat)
-					? this.#options.fastTravel.toElementThat
-					: [this.#options.fastTravel.toElementThat]
+		if (fastTravel) {
+			fastTravelChecks = fastTravel.toElementThat
+				? Array.isArray(fastTravel.toElementThat)
+					? fastTravel.toElementThat
+					: [fastTravel.toElementThat]
 				: []
 
-			if (this.#options.fastTravel.fallback) {
-				fastTravelChecks = [
-					...fastTravelChecks,
-					this.#options.fastTravel.fallback,
-				]
+			if (fastTravel.fallback) {
+				fastTravelChecks = [...fastTravelChecks, fastTravel.fallback]
 			}
 		}
 
@@ -664,16 +652,37 @@ export class HighlightManager<T = {}> {
 
 		const currEl = elements[currIndex]!
 		const currIsVisible = isInViewport(currEl)
-		const currIsAbove = currEl.getBoundingClientRect().bottom < 0
+		const currRect = currEl.getBoundingClientRect()
+		const currIsAboveScreen = currRect.bottom < 0
+		const currIsBeforeScreen = currRect.right < 0
+		const currIsBelowScreen = currRect.top > window.innerHeight
+		const currIsAfterScreen = currRect.left > window.innerWidth
+		const currAnchorPoint = getAnchorPoint(currRect, relativeOptions.anchor)
 
-		if (navigationStyle === 'index-based') {
+		let shouldFastTravel =
+			fastTravel &&
+			!currIsVisible &&
+			(currIsAboveScreen || (currIsBeforeScreen && !currIsBelowScreen))
+
+		if (
+			navigationStyle === 'index-based' ||
+			// That's for delegating the fast travel to index-based when it is unecessary to use relative motion
+			(navigationStyle === 'relative-to' &&
+				shouldFastTravel &&
+				fastTravel!.relativeResolution ===
+					RelativeResolution.INDEX_BASED_FALLBACK &&
+				!(currAnchorPoint.y > 0 && currAnchorPoint.y < window.innerHeight))
+		) {
 			let nextIndex = -1
 
-			if (fastTravelChecks && !currIsVisible && currIsAbove) {
+			if (shouldFastTravel) {
+				if (relativeOptions.debug) {
+					console.log('DELEGATING FAST TRAVEL TO INDEX-BASED')
+				}
 				const candidates = elements.slice(currIndex + 1)
 				let found: HTMLElement | undefined
 
-				for (const check of fastTravelChecks) {
+				for (const check of fastTravelChecks!) {
 					found = candidates.find((el) => visibilityCheck(el, check))
 
 					if (found) {
@@ -702,30 +711,37 @@ export class HighlightManager<T = {}> {
 		}
 
 		const alsoSelectXElementsBehind = 10 // you can tweak this
-		// TODO: probably should exclude the element itself?
 		const candidates = elements.slice(
 			Math.max(0, currIndex - alsoSelectXElementsBehind),
 		)
+		// TODO: probably should exclude the element itself?
 		let closest: HTMLElement | undefined
 
-		if (fastTravelChecks && !currIsVisible && currIsAbove) {
-			for (const check of fastTravelChecks) {
-				closest = getClosestElement(
-					currEl,
-					candidates.filter((el) => visibilityCheck(el, check)),
-					{
-						...relativeOptions,
-						fromRectOverride: {
-							top: 0,
-							bottom: 1,
-						},
-					},
-				)
-
-				if (closest) {
-					scrollStrategy = undefined
+		if (shouldFastTravel) {
+			switch (fastTravel!.relativeResolution) {
+				case RelativeResolution.INDEX_BASED_FALLBACK:
 					break
-				}
+				case RelativeResolution.CLOSEST:
+					for (const check of fastTravelChecks!) {
+						closest = getClosestElement(
+							currEl,
+							candidates.filter((el) => visibilityCheck(el, check)),
+							{
+								...relativeOptions,
+								fromRectOverride: {
+									left: 0,
+									right: 10,
+								},
+								dig: {untilOffscreen: true},
+							},
+						)
+
+						if (closest) {
+							scrollStrategy = undefined
+							break
+						}
+					}
+					break
 			}
 		} else {
 			closest = getClosestElement(currEl, candidates, relativeOptions)
@@ -761,59 +777,390 @@ export class HighlightManager<T = {}> {
 		/**
 		 * Only for "relative-to" mode.
 		 */
-		relativeOptions?: Partial<GetClosestElementOptions>
+		relativeOptions?: Partial<
+			Omit<GetClosestElementOptions, 'anchor'> & {
+				/**
+				 * Anchor point of the reference element from which to calculate the
+				 * distance to candidate elements.
+				 *
+				 * @default Anchor.TOP_CENTER
+				 */
+				anchor: Anchor
+			}
+		>
 
 		/**
 		 * Only for "relative-to" mode.
 		 *
 		 * A callback to execute in case no relative element was found.
 		 */
-		noRelativeCallback?: (info: hlm.HighlightInfo) => void
+		noRelativeCallback?: (info: HighlightInfo) => void
 	}) {
-		this.previous({
-			...options,
-			relativeOptions: {
-				anchor: Anchor.TOP_CENTER,
-				...options?.relativeOptions,
-			},
+		const {
+			navigationStyle = this.#options.navigationStyle,
+			step = 1,
+			noRelativeCallback,
+		} = options ?? {}
+
+		if (navigationStyle === 'index-based') {
+			this.previous(options)
+			return
+		}
+
+		const relativeOptions: GetClosestElementOptions = {
+			...defaultRelativeOptions,
+			...this.#options.relativeOptions,
+			anchor: Anchor.TOP_CENTER,
+			...options?.relativeOptions,
+		}
+		if (relativeOptions.debug) {
+			console.log(relativeOptions)
+		}
+
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
+
+		let scrollStrategy = this.#options.scroll
+
+		let fastTravelChecks: CheckIf[] | undefined
+		if (this.#options.fastTravel) {
+			fastTravelChecks = this.#options.fastTravel.toElementThat
+				? Array.isArray(this.#options.fastTravel.toElementThat)
+					? this.#options.fastTravel.toElementThat
+					: [this.#options.fastTravel.toElementThat]
+				: []
+
+			if (this.#options.fastTravel.fallback) {
+				fastTravelChecks = [
+					...fastTravelChecks,
+					this.#options.fastTravel.fallback,
+				]
+			}
+		}
+
+		const len = elements.length
+		if (len === 0) {
+			this.highlight(-1)
+			return
+		}
+
+		// const currIndex =
+		// 	highlightIndexStart !== highlightIndexEnd
+		// 		? highlightIndexStart + 1
+		// 		: highlightIndexStart
+		const currIndex =
+			highlightIndexStart !== highlightIndexEnd
+				? Math.floor((highlightIndexStart + highlightIndexEnd) / 2)
+				: highlightIndexStart
+
+		if (currIndex === -1) {
+			if (fastTravelChecks) {
+				let found: HTMLElement | undefined
+
+				for (const check of fastTravelChecks) {
+					found = elements.findLast((el) => visibilityCheck(el, check))
+
+					if (found) {
+						const i = elements.indexOf(found)
+						this.highlight(i, i, {scroll: undefined})
+						return
+					}
+				}
+
+				// if (found) {
+				// 	const i = elements.indexOf(found)
+				// 	this.highlight(i, i, {scroll: undefined})
+				// 	return
+				// }
+			}
+
+			this.highlight(this.#options.loop ? len - 1 : 0)
+			return
+		}
+
+		const currEl = elements[currIndex]!
+		const currIsVisible = isInViewport(currEl)
+		const currRect = currEl.getBoundingClientRect()
+		const currIsBelowOrAfter =
+			currRect.top > window.innerHeight || currRect.left > window.innerWidth
+
+		const alsoSelectXElementsAfter = 10 // you can tweak this
+		const candidates = elements.slice(
+			0,
+			currIndex + 1 + alsoSelectXElementsAfter,
+		)
+		// TODO: probably should exclude the element itself?
+		let closest: HTMLElement | undefined
+
+		if (fastTravelChecks && !currIsVisible && currIsBelowOrAfter) {
+			if (!relativeOptions.outerOffset && !relativeOptions.dig.step) {
+				throw new Error(
+					'Either outerOffset or dig.step must be set to fast travel in relative-to mode.',
+				)
+			}
+			for (const check of fastTravelChecks) {
+				closest = getClosestElement(
+					currEl,
+					candidates.filter((el) => visibilityCheck(el, check)),
+					{
+						...relativeOptions,
+						fromRectOverride: {
+							top: window.innerHeight - 10,
+							bottom: window.innerHeight,
+						},
+						dig: {
+							...relativeOptions.dig,
+							count: 500,
+							// window.innerHeight /
+							// (relativeOptions.outerOffset || relativeOptions.dig.step),
+						},
+					},
+				)
+
+				if (closest) {
+					scrollStrategy = undefined
+					break
+				}
+			}
+		} else {
+			closest = getClosestElement(currEl, candidates, relativeOptions)
+		}
+
+		if (!closest) {
+			noRelativeCallback?.(this.getInfo({internal: true}))
+			return
+		}
+
+		const previousIndex = elements.indexOf(closest)
+
+		this.highlight(previousIndex, previousIndex, {
+			scroll: scrollStrategy,
 		})
 	}
 
-	down(options?: {
-		/**
-		 * Navigation style to use for this call.
-		 *
-		 * @default this.#options.navigationStyle
-		 */
-		navigationStyle?: 'index-based' | 'relative-to'
-
-		/**
-		 * Only for "index-based" mode.
-		 *
-		 * @default 1
-		 */
-		step?: number
-
-		/**
-		 * Only for "relative-to" mode.
-		 */
-		relativeOptions?: Partial<GetClosestElementOptions>
-
-		/**
-		 * Only for "relative-to" mode.
-		 *
-		 * A callback to execute in case no relative element was found.
-		 */
-		noRelativeCallback?: (info: hlm.HighlightInfo) => void
-	}) {
-		this.next({
-			...options,
-			relativeOptions: {
-				anchor: Anchor.BOTTOM_CENTER,
-				...options?.relativeOptions,
-			},
-		})
-	}
+	// down(options?: {
+	// 	/**
+	// 	 * Navigation style to use for this call.
+	// 	 *
+	// 	 * @default this.#options.navigationStyle
+	// 	 */
+	// 	navigationStyle?: 'index-based' | 'relative-to'
+	//
+	// 	/**
+	// 	 * Only for "index-based" mode.
+	// 	 *
+	// 	 * @default 1
+	// 	 */
+	// 	step?: number
+	//
+	// 	/**
+	// 	 * Only for "relative-to" mode.
+	// 	 */
+	// 	relativeOptions?: Omit<GetClosestElementOptions, 'anchor'> & {
+	// 		/**
+	// 		 * Anchor point of the reference element from which to calculate the
+	// 		 * distance to candidate elements.
+	// 		 *
+	// 		 * @default Anchor.BOTTOM_CENTER
+	// 		 */
+	// 		anchor: Anchor
+	// 	}
+	//
+	// 	/**
+	// 	 * Only for "relative-to" mode.
+	// 	 *
+	// 	 * A callback to execute in case no relative element was found.
+	// 	 */
+	// 	noRelativeCallback?: (info: hlm.HighlightInfo) => void
+	// }) {
+	// 	const {
+	// 		navigationStyle = this.#options.navigationStyle,
+	// 		step = 1,
+	// 		noRelativeCallback,
+	// 	} = options ?? {}
+	//
+	// 	if (navigationStyle === 'index-based') {
+	// 		this.next(options)
+	// 		return
+	// 	}
+	//
+	// 	const relativeOptions: GetClosestElementOptions = {
+	// 		...defaultRelativeOptions,
+	// 		...this.#options.relativeOptions,
+	// 		anchor: Anchor.BOTTOM_CENTER,
+	// 		...options?.relativeOptions,
+	// 	}
+	// 	if (relativeOptions.debug) {
+	// 		console.log(relativeOptions)
+	// 	}
+	//
+	// 	const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+	// 		internal: true,
+	// 	})
+	//
+	// 	let scrollStrategy = this.#options.scroll
+	//
+	// 	let fastTravelChecks: CheckIf[] | undefined
+	// 	if (this.#options.fastTravel) {
+	// 		fastTravelChecks = this.#options.fastTravel.toElementThat
+	// 			? Array.isArray(this.#options.fastTravel.toElementThat)
+	// 				? this.#options.fastTravel.toElementThat
+	// 				: [this.#options.fastTravel.toElementThat]
+	// 			: []
+	//
+	// 		if (this.#options.fastTravel.fallback) {
+	// 			fastTravelChecks = [
+	// 				...fastTravelChecks,
+	// 				this.#options.fastTravel.fallback,
+	// 			]
+	// 		}
+	// 	}
+	//
+	// 	const len = elements.length
+	// 	if (len === 0) {
+	// 		this.highlight(-1)
+	// 		return
+	// 	}
+	//
+	// 	// const currIndex =
+	// 	// 	highlightIndexStart !== highlightIndexEnd
+	// 	// 		? highlightIndexEnd - 1
+	// 	// 		: highlightIndexEnd
+	// 	const currIndex =
+	// 		highlightIndexStart !== highlightIndexEnd
+	// 			? Math.floor((highlightIndexStart + highlightIndexEnd) / 2)
+	// 			: highlightIndexEnd
+	//
+	// 	if (currIndex === -1) {
+	// 		if (fastTravelChecks) {
+	// 			let found: HTMLElement | undefined
+	//
+	// 			for (const check of fastTravelChecks) {
+	// 				found = elements.find((el) => visibilityCheck(el, check))
+	//
+	// 				if (found) {
+	// 					const i = elements.indexOf(found)
+	// 					this.highlight(i, i, {scroll: undefined})
+	// 					break
+	// 				}
+	// 			}
+	//
+	// 			// if (found) {
+	// 			// 	const i = elements.indexOf(found)
+	// 			// 	this.highlight(i, i, {scroll: undefined})
+	// 			// 	return
+	// 			// }
+	// 		}
+	//
+	// 		this.highlight(0)
+	// 		return
+	// 	}
+	//
+	// 	const currEl = elements[currIndex]!
+	// 	const currIsVisible = isInViewport(currEl)
+	// 	const currRect = currEl.getBoundingClientRect()
+	// 	const currIsAboveScreen = currRect.bottom < 0
+	// 	const currIsBeforeScreen = currRect.right < 0
+	// 	const currIsBelowScreen = currRect.top > window.innerHeight
+	// 	const currIsAfterScreen = currRect.left > window.innerWidth
+	// 	const currAnchorPoint = getAnchorPoint(currRect, relativeOptions.anchor)
+	//
+	// 	let shouldFastTravel =
+	// 		fastTravelChecks &&
+	// 		!currIsVisible &&
+	// 		(currIsAboveScreen || (currIsBeforeScreen && !currIsBelowScreen))
+	//
+	// 	if (
+	// 		// That's for delegating the fast travel to index-based when it is unecessary to use relative motion
+	// 		(navigationStyle === 'relative-to' &&
+	// 			shouldFastTravel &&
+	// 			currIsAboveScreen) ||
+	// 		(currIsAboveScreen &&
+	// 			!(currAnchorPoint.x > 0 && currAnchorPoint.x < window.innerWidth))
+	// 	) {
+	// 		if (relativeOptions.debug) {
+	// 			console.log('DELEGATING FAST TRAVEL TO INDEX-BASED')
+	// 		}
+	// 		this.next({
+	// 			navigationStyle: 'index-based',
+	// 			...options,
+	// 		})
+	//
+	// 		if (shouldFastTravel) {
+	// 			const candidates = elements.slice(currIndex + 1)
+	// 			let found: HTMLElement | undefined
+	//
+	// 			for (const check of fastTravelChecks!) {
+	// 				found = candidates.find((el) => visibilityCheck(el, check))
+	//
+	// 				if (found) {
+	// 					scrollStrategy = undefined
+	// 					nextIndex = elements.indexOf(found)
+	// 					break
+	// 				}
+	// 			}
+	//
+	// 			// if (found) {
+	// 			// 	scrollStrategy = undefined
+	// 			// 	nextIndex = elements.indexOf(found)
+	// 			// }
+	// 		}
+	//
+	// 		if (nextIndex === -1) {
+	// 			nextIndex = this.#options.loop
+	// 				? (currIndex + step) % len
+	// 				: Math.min(len - 1, currIndex + step)
+	// 		}
+	//
+	// 		this.highlight(nextIndex, nextIndex, {
+	// 			scroll: scrollStrategy,
+	// 		})
+	// 		return
+	// 	}
+	//
+	// 	const alsoSelectXElementsBehind = 10 // you can tweak this
+	// 	const candidates = elements.slice(
+	// 		Math.max(0, currIndex - alsoSelectXElementsBehind),
+	// 	)
+	// 	// TODO: probably should exclude the element itself?
+	// 	let closest: HTMLElement | undefined
+	//
+	// 	if (shouldFastTravel) {
+	// 		for (const check of fastTravelChecks!) {
+	// 			closest = getClosestElement(
+	// 				currEl,
+	// 				candidates.filter((el) => visibilityCheck(el, check)),
+	// 				{
+	// 					...relativeOptions,
+	// 					fromRectOverride: {
+	// 						left: 0,
+	// 						right: 10,
+	// 					},
+	// 					dig: {untilOffscreen: true},
+	// 				},
+	// 			)
+	//
+	// 			if (closest) {
+	// 				scrollStrategy = undefined
+	// 				break
+	// 			}
+	// 		}
+	// 	} else {
+	// 		closest = getClosestElement(currEl, candidates, relativeOptions)
+	// 	}
+	//
+	// 	if (!closest) {
+	// 		noRelativeCallback?.(this.getInfo({internal: true}))
+	// 		return
+	// 	}
+	//
+	// 	const nextIndex = elements.indexOf(closest)
+	//
+	// 	this.highlight(nextIndex, nextIndex, {
+	// 		scroll: scrollStrategy,
+	// 	})
+	// }
 
 	extendLeftHighlight(step = 1) {
 		const {highlightIndexStart, highlightIndexEnd} = this.getInfo({

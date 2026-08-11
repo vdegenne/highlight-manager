@@ -10,12 +10,28 @@ export enum Anchor {
 	BOTTOM_RIGHT,
 }
 
+export enum RelativeResolution {
+	/**
+	 * If the element is off-screen and not in the opposite direction of the motion
+	 * use index-based navigation style fallback.
+	 * Or else it will dig until it finds an element in the direction of the motion.
+	 */
+	INDEX_BASED_FALLBACK = 'index-based-fallback',
+	/**
+	 * Always select the closest element in-screen
+	 */
+	CLOSEST = 'closest',
+}
+
 export interface GetClosestElementOptions {
 	/**
 	 * Anchor point of the reference element from which to calculate the
 	 * distance to candidate elements.
 	 *
-	 * @default Anchor.CENTER
+	 * The default value depends on the motion function being invoked,
+	 * For instance, down() will use Anchor.BOTTOM_CENTER value.
+	 *
+	 * You can always replace the default from here, though not recommended.
 	 */
 	anchor: Anchor
 
@@ -55,6 +71,15 @@ export interface GetClosestElementOptions {
 		 * @default 20
 		 */
 		step: number
+
+		/**
+		 * Keep digging until it finds an element, or when it leaves screen.
+		 *
+		 * Setting this value to true will override the `count` option.
+		 *
+		 * @default false
+		 */
+		untilOffscreen: boolean
 	}
 
 	/**
@@ -69,11 +94,11 @@ export const defaultRelativeOptions: GetClosestElementOptions = {
 	anchor: Anchor.CENTER,
 	outerOffset: 0,
 	maxDistance: Infinity,
-	dig: {count: 1, step: 20},
+	dig: {count: 1, step: 20, untilOffscreen: false},
 	debug: false,
 }
 
-function getAnchorPoint(
+export function getAnchorPoint(
 	rect: DOMRect,
 	anchor: Anchor,
 ): {
@@ -164,13 +189,17 @@ export function getClosestElement<T extends Element>(
 		},
 	}
 
+	if (dig.untilOffscreen && outerOffset === 0 && dig.step === 0) {
+		throw new Error(
+			'`dig.untilOffscreen` requires `outerOffset` or `dig.step` to be greater than 0.',
+		)
+	}
+
 	/*
 	 * Note: DOMRect's values are relative to the viewport not the entire document.
 	 *		`left` and `top` are typically aliases for `x` and `y`.
 	 */
 	const elementRect = element.getBoundingClientRect()
-	// console.clear()
-	// console.log(JSON.stringify(elementRect, null, 2))
 
 	const left = fromRectOverride?.left ?? elementRect.left
 	const top = fromRectOverride?.top ?? elementRect.top
@@ -185,7 +214,8 @@ export function getClosestElement<T extends Element>(
 	const candidates = [...elements]
 
 	// DIG
-	for (let attempt = 0; attempt < dig.count; attempt++) {
+	let attempt = 0
+	for (attempt = 0; dig.untilOffscreen || attempt < dig.count; attempt++) {
 		const currentOuterOffset = outerOffset + (outerOffset || dig.step) * attempt
 
 		const referencePoint = {
@@ -193,9 +223,18 @@ export function getClosestElement<T extends Element>(
 			y: anchorPoint.y + anchorOffset.y * currentOuterOffset,
 		}
 
-		if (debug) {
-			console.log(referencePoint)
+		// Stop digging once the reference point leaves the viewport.
+		if (
+			dig.untilOffscreen &&
+			(referencePoint.x < 0 ||
+				referencePoint.x > window.innerWidth ||
+				referencePoint.y < 0 ||
+				referencePoint.y > window.innerHeight)
+		) {
+			break
+		}
 
+		if (debug) {
 			const debugPoint = document.createElement('div')
 
 			Object.assign(debugPoint.style, {
@@ -244,7 +283,7 @@ export function getClosestElement<T extends Element>(
 				debugRect.style.opacity = '0'
 			})
 
-			setTimeout(removeDebug, 1500)
+			setTimeout(removeDebug, 1300)
 		}
 
 		const maxDistanceSquared =
@@ -280,6 +319,10 @@ export function getClosestElement<T extends Element>(
 		if (closestElement) {
 			return closestElement
 		}
+	}
+
+	if (debug && dig.untilOffscreen) {
+		console.log(`Dig iterations: ${attempt}`)
 	}
 
 	return undefined
