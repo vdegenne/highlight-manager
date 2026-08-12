@@ -15,7 +15,7 @@ export interface FastTravelOptions {
 	fallback: CheckIf | undefined
 
 	/**
-	 * @default RelativeResolution.INDEX_BASED_FALLBACK
+	 * @default RelativeResolution.INDEX_BASED_CLOSEST
 	 */
 	relativeResolution: RelativeResolution
 
@@ -30,7 +30,7 @@ export interface FastTravelOptions {
 export const fastTravelDefaults: FastTravelOptions = {
 	toElementThat: (is) => is('fully-visible'),
 	fallback: (is) => is('partially-visible'),
-	relativeResolution: RelativeResolution.INDEX_BASED_FALLBACK,
+	relativeResolution: RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST,
 }
 
 export function resolveFastTravelOptions(

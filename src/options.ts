@@ -1,9 +1,16 @@
 import {fastTravelDefaults, FastTravelOptions} from './fast-travel.js'
-import {HighlightInfo, NavigationStyle, ScrollStrategy} from './index.js'
+import {HighlightInfo, ScrollStrategy} from './index.js'
 import {
 	defaultRelativeOptions,
 	GetClosestElementOptions,
+	WithAnchorOption,
+	WithRectOverrideOption,
 } from './relative-selection.js'
+
+export enum NavigationStyle {
+	INDEX_BASED = 'index-based',
+	RELATIVE_TO = 'relative-to',
+}
 
 export const defaultOptions: Options<any> = {
 	atomicSelection(_element) {
@@ -15,7 +22,7 @@ export const defaultOptions: Options<any> = {
 	// css: 'background-color: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important',
 	// css: 'background-color: var(--md-sys-color-outline-variant) !important; color: var(--md-sys-color-on-surface) !important',
 	highlightTextColor: 'var(--md-sys-color-on-primary-container)',
-	navigationStyle: 'index-based',
+	navigationStyle: NavigationStyle.INDEX_BASED,
 	relativeOptions: defaultRelativeOptions,
 	loop: false,
 	beforeHighlight: undefined,
@@ -31,14 +38,14 @@ export interface Options<T = {}> {
 	highlightTextColor: string
 
 	/**
-	 * @default 'index-based'
+	 * @default NavigationStyle.INDEX_BASED
 	 */
 	navigationStyle: NavigationStyle
 
 	/**
 	 * Only in "relative-to" mode.
 	 */
-	relativeOptions: Partial<Omit<GetClosestElementOptions, 'anchor'>>
+	relativeOptions: GetClosestElementOptions
 
 	/**
 	 * Should the highlight go back at the beginning when we reach the end?
@@ -175,7 +182,9 @@ export type MotionOptions = {
 	/**
 	 * Only for "relative-to" mode.
 	 */
-	relativeOptions: GetClosestElementOptions
+	relativeOptions: GetClosestElementOptions &
+		WithAnchorOption &
+		Partial<WithRectOverrideOption>
 
 	/**
 	 * Only for "relative-to" mode.
@@ -187,7 +196,12 @@ export type MotionOptions = {
 
 export type MotionOptionsInput = Omit<
 	Partial<MotionOptions>,
-	'relativeOptions'
+	'relativeOptions' | 'fastTravel'
 > & {
-	relativeOptions?: Partial<GetClosestElementOptions>
+	fastTravel?: Partial<FastTravelOptions>
+	relativeOptions?: Partial<
+		Omit<GetClosestElementOptions, 'dig'> & {
+			dig: Partial<GetClosestElementOptions['dig']>
+		}
+	>
 }

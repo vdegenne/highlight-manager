@@ -12,29 +12,28 @@ export enum Anchor {
 
 export enum RelativeResolution {
 	/**
-	 * If the element is off-screen and not in the opposite direction of the motion
-	 * use index-based navigation style fallback.
-	 * Or else it will dig until it finds an element in the direction of the motion.
+	 * Try to use index based fast travel if direct dig relative fast travel is not possible.
+	 *
+	 * If direct dig relative fast travel is possible, will try to dig,
+	 * or do nothing if the dig search failed.
+	 *
+	 * `noRelativeCallback` (from the motion functions) can be used to execute code
+	 * when none of the above succeeded.
 	 */
-	INDEX_BASED_FALLBACK = 'index-based-fallback',
+	INDEX_BASED_OR_DIG,
+
+	/**
+	 * Like INDEX_BASED_FALLBACK but if the dig fails, will select the closest element.
+	 */
+	INDEX_BASED_OR_DIG_OR_CLOSEST,
+
 	/**
 	 * Always select the closest element in-screen
 	 */
-	CLOSEST = 'closest',
+	CLOSEST,
 }
 
 export interface GetClosestElementOptions {
-	/**
-	 * Anchor point of the reference element from which to calculate the
-	 * distance to candidate elements.
-	 *
-	 * The default value depends on the motion function being invoked,
-	 * For instance, down() will use Anchor.BOTTOM_CENTER value.
-	 *
-	 * You can always replace the default from here, though not recommended.
-	 */
-	anchor: Anchor
-
 	/**
 	 * Distance in CSS pixels to extend the reference point beyond the
 	 * anchor in the direction from the center toward the anchor.
@@ -93,11 +92,44 @@ export interface GetClosestElementOptions {
 	debug: boolean
 }
 
+export interface WithAnchorOption {
+	/**
+	 * Anchor point of the reference element from which to calculate the
+	 * distance to candidate elements.
+	 *
+	 * The default value depends on the motion function being invoked,
+	 * For instance, down() will use Anchor.BOTTOM_CENTER value.
+	 *
+	 * You can always replace the default from here, though not recommended.
+	 */
+	anchor: Anchor
+}
+
+interface Rect {
+	left: number
+	right: number
+	top: number
+	bottom: number
+}
+
+export interface WithRectOverrideOption {
+	/**
+	 * Use these values to override element rect values.
+	 *
+	 * This is particularly useful if you want to start finding elements
+	 * from another point in space. For example, when the new top should
+	 * be the top of the screen while the left and right remain coherent
+	 * with the current element's rect values.
+	 *
+	 * The provided values are merged with the element's rect values.
+	 */
+	rectOverride: Rect
+}
+
 export const defaultRelativeOptions: GetClosestElementOptions = {
-	anchor: Anchor.CENTER,
 	outerOffset: 0,
 	maxDistance: Infinity,
-	dig: {count: 1, step: 0, untilOffscreen: false},
+	dig: {count: 1, step: 20, untilOffscreen: false},
 	debug: false,
 }
 
@@ -160,31 +192,28 @@ function getAnchorOffset(anchor: Anchor): {
 }
 
 export function getClosestElement<T extends Element>(
-	element: T,
+	from: T | undefined,
 	elements: Iterable<T>,
 	options?: DeepPartial<
-		GetClosestElementOptions & {
-			/**
-			 * Use these values to override element rect values.
-			 *
-			 * This is particularly useful if you want to start finding elements
-			 * from another point in space. For example, when the new top should
-			 * be the top of the screen while the left and right remain coherent
-			 * with the current element's rect values.
-			 *
-			 * The provided values are merged with the element's rect values.
-			 */
-			fromRectOverride: {
-				left: number
-				right: number
-				top: number
-				bottom: number
-			}
-		}
-	>,
+		GetClosestElementOptions & WithAnchorOption & WithRectOverrideOption
+	> & {
+		/**
+		 * @default true (current)
+		 */
+		stopWhenInsideAnElement?: boolean
+	},
 ): T | undefined {
-	const {anchor, outerOffset, maxDistance, dig, debug, fromRectOverride} = {
+	const {
+		anchor,
+		outerOffset,
+		maxDistance,
+		dig,
+		debug,
+		rectOverride,
+		stopWhenInsideAnElement = true,
+	} = {
 		...defaultRelativeOptions,
+		anchor: Anchor.CENTER,
 		...options,
 		dig: {
 			...defaultRelativeOptions.dig,
@@ -194,11 +223,25 @@ export function getClosestElement<T extends Element>(
 
 	if (
 		(dig.untilOffscreen || dig.count > 2) &&
-		outerOffset === 0 &&
+		// outerOffset === 0 &&
 		dig.step === 0
 	) {
 		throw new Error(
-			'When digging, at least `dig.step` OR `outerOffset` needs to be greater than 0.',
+			// 'When digging, at least `dig.step` OR `outerOffset` need to be greater than 0.',
+			'When digging, at least `dig.step` needs to be greater than 0.',
+		)
+	}
+
+	if (
+		!from &&
+		(!rectOverride ||
+			rectOverride.left === undefined ||
+			rectOverride.top === undefined ||
+			rectOverride.right === undefined ||
+			rectOverride.bottom === undefined)
+	) {
+		throw new Error(
+			'When `from` (no currently highlighted element) is undefined, all `rectOverride` values must be provided.',
 		)
 	}
 
@@ -206,14 +249,14 @@ export function getClosestElement<T extends Element>(
 	 * Note: DOMRect's values are relative to the viewport not the entire document.
 	 *		`left` and `top` are typically aliases for `x` and `y`.
 	 */
-	const elementRect = element.getBoundingClientRect()
+	const elementRect = from?.getBoundingClientRect()
 
-	const left = fromRectOverride?.left ?? elementRect.left
-	const top = fromRectOverride?.top ?? elementRect.top
-	const right = fromRectOverride?.right ?? elementRect.right
-	const bottom = fromRectOverride?.bottom ?? elementRect.bottom
+	const left = rectOverride?.left ?? elementRect?.left
+	const top = rectOverride?.top ?? elementRect?.top
+	const right = rectOverride?.right ?? elementRect?.right
+	const bottom = rectOverride?.bottom ?? elementRect?.bottom
 
-	const rect = new DOMRect(left, top, right - left, bottom - top)
+	const rect = new DOMRect(left!, top!, right! - left!, bottom! - top!)
 
 	const anchorPoint = getAnchorPoint(rect, anchor)
 	const anchorOffset = getAnchorOffset(anchor)
@@ -223,7 +266,8 @@ export function getClosestElement<T extends Element>(
 	// DIG
 	let attempt = 0
 	for (attempt = 0; dig.untilOffscreen || attempt < dig.count; attempt++) {
-		const currentOuterOffset = outerOffset + (dig.step || outerOffset) * attempt
+		const currentOuterOffset =
+			outerOffset + dig.step /* || outerOffset*/ * attempt
 
 		const referencePoint = {
 			x: anchorPoint.x + anchorOffset.x * currentOuterOffset,
@@ -299,8 +343,10 @@ export function getClosestElement<T extends Element>(
 		let closestElement: T | undefined
 		let closestDistance = maxDistanceSquared
 
+		let c = 0
 		for (const candidate of candidates) {
-			if (candidate === element) continue
+			c++
+			if (candidate === from) continue
 
 			const rect = candidate.getBoundingClientRect()
 
@@ -320,10 +366,18 @@ export function getClosestElement<T extends Element>(
 			if (distance < closestDistance) {
 				closestDistance = distance
 				closestElement = candidate
+
+				if (stopWhenInsideAnElement && distance === 0) {
+					console.log('DIG FOUND AN ELEMENT (found on candidate #' + c + ')')
+					break
+				}
 			}
 		}
 
 		if (closestElement) {
+			if (debug) {
+				console.log(`Dig iterations: ${attempt}`)
+			}
 			return closestElement
 		}
 	}
