@@ -17,7 +17,7 @@ export interface FastTravelOptions {
 	/**
 	 * @default RelativeResolution.INDEX_BASED_CLOSEST
 	 */
-	relativeResolution: RelativeResolution
+	relativeResolution: RelativeResolution | `${RelativeResolution}`
 
 	/**
 	 * TODO: TO IMPLEMENT

@@ -11,6 +11,8 @@ export enum Anchor {
 }
 
 export enum RelativeResolution {
+	INDEX_BASED,
+
 	/**
 	 * Try to use index based fast travel if direct dig relative fast travel is not possible.
 	 *
@@ -220,6 +222,16 @@ export function getClosestElement<T extends Element>(
 			...options?.dig,
 		},
 	}
+
+	// console.log(
+	// 	anchor,
+	// 	outerOffset,
+	// 	maxDistance,
+	// 	dig,
+	// 	debug,
+	// 	rectOverride,
+	// 	stopWhenInsideAnElement,
+	// )
 
 	if (
 		(dig.untilOffscreen || dig.count > 2) &&

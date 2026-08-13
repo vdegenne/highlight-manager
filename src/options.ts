@@ -40,7 +40,7 @@ export interface Options<T = {}> {
 	/**
 	 * @default NavigationStyle.INDEX_BASED
 	 */
-	navigationStyle: NavigationStyle
+	navigationStyle: NavigationStyle | `${NavigationStyle}`
 
 	/**
 	 * Only in "relative-to" mode.
@@ -165,7 +165,7 @@ export type MotionOptions = {
 	 *
 	 * @default this.#options.navigationStyle
 	 */
-	navigationStyle: NavigationStyle
+	navigationStyle: NavigationStyle | `${NavigationStyle}`
 
 	/**
 	 * Only for "index-based" mode.
@@ -191,7 +191,7 @@ export type MotionOptions = {
 	 *
 	 * A callback to execute in case no relative element was found.
 	 */
-	noRelativeCallback: ((info: HighlightInfo) => void) | undefined
+	// noRelativeCallback: ((info: HighlightInfo) => void) | undefined
 }
 
 export type MotionOptionsInput = Omit<
