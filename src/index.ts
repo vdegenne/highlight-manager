@@ -345,15 +345,12 @@ export class HighlightManager<T = {}> {
 		return true
 	}
 
-	/**
-	 * TODO: should implement this so users can use this as a fallback
-	 */
 	relativeMotion(
 		options: DeepPartial<GetClosestElementOptions & WithRectOverrideOption> &
 			WithAnchorOption & {
-				noRelativeCallback?: (info: HighlightInfo) => void
+				// noRelativeCallback?: (info: HighlightInfo) => void
 			},
-	) {
+	): boolean {
 		// TODO: should we take care of multi?
 		const {elements, highlightElement} = this.getInfo({internal: true})
 		const currIndex = highlightElement ? elements.indexOf(highlightElement) : 0
@@ -376,13 +373,12 @@ export class HighlightManager<T = {}> {
 		})
 
 		if (found) {
-			const index = elements.indexOf(found)
-			this.highlight(index, index, {
-				scroll: this._options.scroll,
-			})
-		} else {
-			options.noRelativeCallback?.(this.getInfo({internal: true}))
+			this.highlight(elements.indexOf(found))
+			return true
 		}
+
+		// options.noRelativeCallback?.(this.getInfo({internal: true}))
+		return false
 	}
 
 	/**

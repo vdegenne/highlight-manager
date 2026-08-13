@@ -7,16 +7,13 @@ import {
 	defaultRelativeOptions,
 	getAnchorPoint,
 	getClosestElement,
-	GetClosestElementOptions,
 	RelativeResolution,
-	WithAnchorOption,
-	WithRectOverrideOption,
 } from '../relative-selection.js'
 
 export function down(
 	this: HighlightManager,
 	motionOptions?: MotionOptionsInput,
-) {
+): boolean {
 	const options: MotionOptions = {
 		...motionOptions,
 		navigationStyle:
@@ -44,7 +41,7 @@ export function down(
 			},
 		},
 
-		noRelativeCallback: motionOptions?.noRelativeCallback,
+		// noRelativeCallback: motionOptions?.noRelativeCallback,
 	}
 
 	// const {
@@ -83,10 +80,10 @@ export function down(
 	const len = elements.length
 	if (len === 0) {
 		this.highlight(-1)
-		return
+		return true
 	}
 
-	let scrollStrategy = this._options.scroll
+	// let scrollStrategy = this._options.scroll
 
 	let fastTravelChecks: CheckIf[] | undefined
 	if (options.fastTravel) {
@@ -118,15 +115,14 @@ export function down(
 				found = elements.find((el) => visibilityCheck(el, check))
 
 				if (found) {
-					const i = elements.indexOf(found)
-					this.highlight(i, i /*, {scroll: undefined}*/)
-					break
+					this.highlight(elements.indexOf(found))
+					return true
 				}
 			}
 		}
 
 		this.highlight(0)
-		return
+		return true
 	}
 
 	const currEl = elements[currIndex]!
@@ -156,12 +152,11 @@ export function down(
 					RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST) &&
 			!(currAnchorPoint.x > 0 && currAnchorPoint.x < window.innerWidth))
 	) {
-		let nextIndex = -1
-
 		if (shouldFastTravel) {
 			if (options.relativeOptions.debug) {
 				console.log('DELEGATING FAST TRAVEL TO INDEX-BASED')
 			}
+			// TODO: next line is probably wrong (too fuzzy)
 			const candidates = elements.slice(currIndex + 1)
 			let found: HTMLElement | undefined
 
@@ -169,109 +164,108 @@ export function down(
 				found = candidates.find((el) => visibilityCheck(el, check))
 
 				if (found) {
-					// scrollStrategy = undefined
-					nextIndex = elements.indexOf(found)
-					break
+					this.highlight(elements.indexOf(found))
+					return true
 				}
 			}
+			if (
+				options.navigationStyle === NavigationStyle.INDEX_BASED ||
+				options.fastTravel!.relativeResolution ===
+					RelativeResolution.INDEX_BASED
+			) {
+				return false
+			}
+		} else {
+			this.highlight(
+				this._options.loop
+					? (currIndex + options.step) % len
+					: Math.min(len - 1, currIndex + options.step),
+			)
+			return true
 		}
-
-		if (nextIndex === -1) {
-			nextIndex = this._options.loop
-				? (currIndex + options.step) % len
-				: Math.min(len - 1, currIndex + options.step)
-		}
-
-		this.highlight(nextIndex, nextIndex, {
-			scroll: scrollStrategy,
-		})
-		return
 	}
 
-	const alsoSelectXElementsBehind = 10 // you can tweak this
-	const candidates = elements.slice(
-		Math.max(0, currIndex - alsoSelectXElementsBehind),
-	)
-	// TODO: probably should exclude the element itself?
-	// normally not because getClosestElement already exclude it from the candidates
+	// const alsoSelectXElementsBehind = 10 // you can tweak this
+	// const candidates = elements.slice(
+	// 	Math.max(0, currIndex - alsoSelectXElementsBehind),
+	// )
+
+	// Order elements around the current index to maximize the chance
+	// of hitting the closest element faster.
+	const candidates = elements
+		.slice()
+		.sort(
+			(a, b) =>
+				Math.abs(elements.indexOf(a) - currIndex) -
+				Math.abs(elements.indexOf(b) - currIndex),
+		)
+
 	let closest: HTMLElement | undefined
 
 	if (shouldFastTravel) {
-		let searchClosestOptions: DeepPartial<
-			GetClosestElementOptions & WithAnchorOption & WithRectOverrideOption
-		> = {}
-		switch (options.fastTravel!.relativeResolution) {
-			case RelativeResolution.INDEX_BASED_OR_DIG:
-			case RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST:
-				searchClosestOptions = {
-					...options.relativeOptions,
-					rectOverride: {
-						top: 0,
-						bottom: 10,
+		// DIG
+		if (
+			options.fastTravel!.relativeResolution ===
+				RelativeResolution.INDEX_BASED_OR_DIG ||
+			options.fastTravel!.relativeResolution ===
+				RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST
+		) {
+			for (const check of fastTravelChecks!) {
+				closest = getClosestElement(
+					currEl,
+					candidates.filter((el) => visibilityCheck(el, check)),
+					{
+						...options.relativeOptions,
+						rectOverride: {
+							top: 0,
+							bottom: 10,
+						},
+						dig: {
+							...options.relativeOptions.dig,
+							untilOffscreen: true,
+						},
 					},
-					dig: {
-						...options.relativeOptions.dig,
-						untilOffscreen: true,
-					},
-				}
-				break
-			case RelativeResolution.CLOSEST:
-				searchClosestOptions = {
-					...options.relativeOptions,
-					maxDistance: Infinity,
-					dig: {},
-				}
-				break
-		}
+				)
 
-		for (const check of fastTravelChecks!) {
-			closest = getClosestElement(
-				currEl,
-				candidates.filter((el) => visibilityCheck(el, check)),
-				searchClosestOptions,
-			)
-
-			if (closest) {
-				// scrollStrategy = undefined
-				break
+				if (closest) {
+					this.highlight(elements.indexOf(closest))
+					return true
+				}
 			}
 		}
-	} else {
-		closest = getClosestElement(currEl, candidates, options.relativeOptions)
-	}
 
-	if (
-		!closest &&
-		shouldFastTravel &&
-		options.fastTravel!.relativeResolution ===
+		// OR CLOSEST
+		if (
+			options.fastTravel!.relativeResolution ===
 			RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST
-	) {
-		for (const check of fastTravelChecks!) {
-			closest = getClosestElement(
-				currEl,
-				candidates.filter((el) => visibilityCheck(el, check)),
-				{
-					...options.relativeOptions,
-					maxDistance: Infinity,
-					dig: {},
-				},
-			)
+		)
+			for (const check of fastTravelChecks!) {
+				closest = getClosestElement(
+					currEl,
+					candidates.filter((el) => visibilityCheck(el, check)),
+					{
+						...options.relativeOptions,
+						maxDistance: Infinity,
+						dig: {},
+					},
+				)
 
-			if (closest) {
-				// scrollStrategy = undefined
-				break
+				if (closest) {
+					this.highlight(elements.indexOf(closest))
+					return true
+				}
 			}
-		}
+
+		return false // fast travel failed
 	}
 
-	if (!closest) {
-		options.noRelativeCallback?.(this.getInfo({internal: true}))
-		return
+	// Normal navigation
+	closest = getClosestElement(currEl, candidates, options.relativeOptions)
+
+	if (closest) {
+		this.highlight(elements.indexOf(closest))
+		return true
 	}
 
-	const nextIndex = elements.indexOf(closest)
-
-	this.highlight(nextIndex, nextIndex, {
-		scroll: scrollStrategy,
-	})
+	return false // normal navigation failed
 }

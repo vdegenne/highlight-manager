@@ -394,7 +394,7 @@ export function getClosestElement<T extends Element>(
 		}
 	}
 
-	if (debug && dig.untilOffscreen) {
+	if (debug) {
 		console.log(`Dig iterations: ${attempt}`)
 	}
 

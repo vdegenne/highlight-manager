@@ -80,7 +80,7 @@ export function previous(
 	const len = elements.length
 	if (len === 0) {
 		this.highlight(-1)
-		return true // TODO: should this be true or false
+		return true
 	}
 
 	// let scrollStrategy = this._options.scroll
@@ -115,8 +115,7 @@ export function previous(
 				found = elements.find((el) => visibilityCheck(el, check))
 
 				if (found) {
-					const i = elements.indexOf(found)
-					this.highlight(i, i /*, {scroll: undefined}*/)
+					this.highlight(elements.indexOf(found))
 					return true
 				}
 			}
@@ -155,8 +154,6 @@ export function previous(
 						RelativeResolution.INDEX_BASED_OR_DIG_OR_CLOSEST) &&
 					!(currAnchorPoint.y > 0 && currAnchorPoint.y < window.innerHeight))))
 	) {
-		let nextIndex = -1
-
 		if (shouldFastTravel) {
 			if (options.relativeOptions.debug) {
 				console.log('DELEGATING FAST TRAVEL TO INDEX-BASED')
@@ -169,8 +166,7 @@ export function previous(
 				found = candidates.find((el) => visibilityCheck(el, check))
 
 				if (found) {
-					nextIndex = elements.indexOf(found)
-					this.highlight(nextIndex)
+					this.highlight(elements.indexOf(found))
 					return true
 				}
 			}
@@ -183,11 +179,11 @@ export function previous(
 				return false
 			}
 		} else {
-			nextIndex = this._options.loop
-				? (currIndex - options.step + len) % len
-				: Math.max(0, currIndex + options.step)
-
-			this.highlight(nextIndex)
+			this.highlight(
+				this._options.loop
+					? (currIndex - options.step + len) % len
+					: Math.max(0, currIndex + options.step),
+			)
 			return true
 		}
 	}
@@ -235,8 +231,7 @@ export function previous(
 				)
 
 				if (closest) {
-					const nextIndex = elements.indexOf(closest)
-					this.highlight(nextIndex, nextIndex /*, {scroll: undefined}*/)
+					this.highlight(elements.indexOf(closest))
 					return true
 				}
 			}
@@ -259,8 +254,7 @@ export function previous(
 				)
 
 				if (closest) {
-					const nextIndex = elements.indexOf(closest)
-					this.highlight(nextIndex, nextIndex /*, {scroll: undefined}*/)
+					this.highlight(elements.indexOf(closest))
 					return true
 				}
 			}
@@ -272,8 +266,7 @@ export function previous(
 	closest = getClosestElement(currEl, candidates, options.relativeOptions)
 
 	if (closest) {
-		const nextIndex = elements.indexOf(closest)
-		this.highlight(nextIndex)
+		this.highlight(elements.indexOf(closest))
 		return true
 	}
 
