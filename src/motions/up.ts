@@ -183,7 +183,7 @@ export function up(
 			this.highlight(
 				this._options.loop
 					? (currIndex - options.step + len) % len
-					: Math.max(0, currIndex + options.step),
+					: Math.max(0, currIndex - options.step),
 			)
 			return true
 		}

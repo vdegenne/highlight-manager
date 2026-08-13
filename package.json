@@ -1,6 +1,6 @@
 {
 	"name": "@vdegenne/highlight-manager",
-	"version": "1.0.16",
+	"version": "1.0.18",
 	"description": "helper to navigate/highlight elements in a page based on a css selector",
 	"type": "module",
 	"exports": {
