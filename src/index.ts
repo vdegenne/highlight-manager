@@ -347,10 +347,12 @@ export class HighlightManager<T = {}> {
 	}
 
 	relativeMotion(
-		options: DeepPartial<GetClosestElementOptions & WithRectOverrideOption> &
+		options: DeepPartial<
+			GetClosestElementOptions & WithRectOverrideOption & WithMedianBreak
+		> &
 			WithAnchorOption & {
 				// noRelativeCallback?: (info: HighlightInfo) => void
-			} & WithMedianBreak,
+			},
 	): boolean {
 		// TODO: should we take care of multi?
 		const {elements, highlightElement, highlightIndexStart, highlightIndexEnd} =
