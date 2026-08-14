@@ -15,10 +15,12 @@ export function down(
 	motionOptions?: MotionOptionsInput,
 ): boolean {
 	const options: MotionOptions = {
-		...motionOptions,
+		// ...motionOptions,
 		navigationStyle:
 			motionOptions?.navigationStyle ?? this._options.navigationStyle,
 		step: motionOptions?.step ?? 1,
+
+		medianBreak: motionOptions?.medianBreak ?? this._options.medianBreak,
 
 		fastTravel:
 			this._options.fastTravel || motionOptions?.fastTravel
@@ -40,8 +42,6 @@ export function down(
 				...motionOptions?.relativeOptions?.dig,
 			},
 		},
-
-		// noRelativeCallback: motionOptions?.noRelativeCallback,
 	}
 
 	// const {
@@ -69,10 +69,6 @@ export function down(
 	// 	...options?.fastTravel,
 	// }
 
-	if (options.relativeOptions.debug) {
-		// console.log(options)
-	}
-
 	const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
 		internal: true,
 	})
@@ -82,8 +78,6 @@ export function down(
 		this.highlight(-1)
 		return true
 	}
-
-	// let scrollStrategy = this._options.scroll
 
 	let fastTravelChecks: CheckIf[] | undefined
 	if (options.fastTravel) {
@@ -98,14 +92,16 @@ export function down(
 		}
 	}
 
-	// const currIndex =
-	// 	highlightIndexStart !== highlightIndexEnd
-	// 		? highlightIndexEnd - 1
-	// 		: highlightIndexEnd
-	const currIndex =
-		highlightIndexStart !== highlightIndexEnd
-			? Math.floor((highlightIndexStart + highlightIndexEnd) / 2)
-			: highlightIndexEnd
+	let currIndex: number
+	if (highlightIndexStart !== highlightIndexEnd) {
+		if (options.medianBreak ?? true) {
+			currIndex = Math.floor((highlightIndexStart + highlightIndexEnd) / 2)
+		} else {
+			currIndex = highlightIndexEnd - 1
+		}
+	} else {
+		currIndex = highlightIndexEnd
+	}
 
 	if (currIndex === -1) {
 		if (fastTravelChecks) {

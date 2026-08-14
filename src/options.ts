@@ -31,9 +31,10 @@ export const defaultOptions: Options<any> = {
 	scroll: undefined,
 	fastTravel: fastTravelDefaults,
 	focusElementOnHighlight: false,
+	medianBreak: undefined,
 } // satisfies Omit<Options<any>, 'getInfoMiddleware'>
 
-export interface Options<T = {}> {
+export interface Options<T = {}> extends WithMedianBreak {
 	css: string
 	highlightTextColor: string
 
@@ -58,6 +59,7 @@ export interface Options<T = {}> {
 	 * @default false
 	 */
 	loop: boolean
+
 	/**
 	 * A function for extra selection if selector is not enough
 	 * and need a way to filter elements based on properties.
@@ -107,6 +109,19 @@ export interface Options<T = {}> {
 	focusElementOnHighlight: boolean
 
 	getInfoMiddleware?: (info: HighlightInfo) => T
+}
+
+export interface WithMedianBreak {
+	/**
+	 * When true, leaving a multi highlight would cause the steps to resume from middle point.
+	 *
+	 * Leave it as "undefined" to use the default behavior:
+	 * - false on horizontal motions
+	 * - true on vertical motions
+	 *
+	 * @default undefined
+	 */
+	medianBreak: boolean | undefined
 }
 
 export type OptionsInput<T> = Partial<
@@ -159,7 +174,7 @@ export function mergeOptions<T extends object, U extends object>(
 	return result as T
 }
 
-export type MotionOptions = {
+export interface MotionOptions extends WithMedianBreak {
 	/**
 	 * Navigation style to use for this call.
 	 *
@@ -185,13 +200,6 @@ export type MotionOptions = {
 	relativeOptions: GetClosestElementOptions &
 		WithAnchorOption &
 		Partial<WithRectOverrideOption>
-
-	/**
-	 * Only for "relative-to" mode.
-	 *
-	 * A callback to execute in case no relative element was found.
-	 */
-	// noRelativeCallback: ((info: HighlightInfo) => void) | undefined
 }
 
 export type MotionOptionsInput = Omit<
