@@ -212,7 +212,7 @@ export function getClosestElement<T extends Element>(
 		dig,
 		debug,
 		rectOverride,
-		stopWhenInsideAnElement = true,
+		stopWhenInsideAnElement = false,
 	} = {
 		...defaultRelativeOptions,
 		anchor: Anchor.CENTER,

@@ -354,7 +354,6 @@ export class HighlightManager<T = {}> {
 				// noRelativeCallback?: (info: HighlightInfo) => void
 			},
 	): boolean {
-		// TODO: should we take care of multi?
 		const {elements, highlightElement, highlightIndexStart, highlightIndexEnd} =
 			this.getInfo({internal: true})
 
@@ -395,11 +394,13 @@ export class HighlightManager<T = {}> {
 			currIndex = highlightIndexStart
 		}
 
-		const orderedElements = elements.sort(
-			(a, b) =>
-				Math.abs(elements.indexOf(a) - currIndex) -
-				Math.abs(elements.indexOf(b) - currIndex),
-		)
+		const orderedElements = elements
+			.slice()
+			.sort(
+				(a, b) =>
+					Math.abs(elements.indexOf(a) - currIndex) -
+					Math.abs(elements.indexOf(b) - currIndex),
+			)
 
 		const found = getClosestElement(highlightElement, orderedElements, {
 			...defaultRelativeOptions,
