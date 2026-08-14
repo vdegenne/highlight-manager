@@ -14,6 +14,7 @@ import {
 	NavigationStyle,
 	Options,
 	OptionsInput,
+	WithMedianBreak,
 } from './options.js'
 import {
 	Anchor,
@@ -349,13 +350,50 @@ export class HighlightManager<T = {}> {
 		options: DeepPartial<GetClosestElementOptions & WithRectOverrideOption> &
 			WithAnchorOption & {
 				// noRelativeCallback?: (info: HighlightInfo) => void
-			},
+			} & WithMedianBreak,
 	): boolean {
 		// TODO: should we take care of multi?
-		const {elements, highlightElement} = this.getInfo({internal: true})
-		const currIndex = highlightElement ? elements.indexOf(highlightElement) : 0
+		const {elements, highlightElement, highlightIndexStart, highlightIndexEnd} =
+			this.getInfo({internal: true})
 
-		const orderedElements = [...elements].sort(
+		let currIndex: number
+		if (highlightIndexStart !== highlightIndexEnd) {
+			if (options.medianBreak) {
+				currIndex = Math.floor((highlightIndexStart + highlightIndexEnd) / 2)
+			} else {
+				switch (options.anchor) {
+					case Anchor.TOP_LEFT:
+					case Anchor.CENTER_LEFT:
+					case Anchor.BOTTOM_LEFT:
+						currIndex = highlightIndexStart
+						break
+
+					case Anchor.TOP_CENTER:
+					case Anchor.CENTER:
+					case Anchor.BOTTOM_CENTER:
+						if (options.medianBreak === false) {
+							// It's in the middle, so we can't really determine.
+							// Assume default.
+							currIndex = highlightIndexStart
+						} else {
+							currIndex = Math.floor(
+								(highlightIndexStart + highlightIndexEnd) / 2,
+							)
+						}
+						break
+
+					case Anchor.TOP_RIGHT:
+					case Anchor.CENTER_RIGHT:
+					case Anchor.BOTTOM_RIGHT:
+						currIndex = highlightIndexEnd
+						break
+				}
+			}
+		} else {
+			currIndex = highlightIndexStart
+		}
+
+		const orderedElements = elements.sort(
 			(a, b) =>
 				Math.abs(elements.indexOf(a) - currIndex) -
 				Math.abs(elements.indexOf(b) - currIndex),
