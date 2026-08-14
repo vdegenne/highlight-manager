@@ -48,7 +48,7 @@ export interface GetClosestElementOptions {
 	 * Maximum distance in CSS pixels within which a candidate element can be
 	 * selected. Candidates beyond this distance are ignored.
 	 *
-	 * @default Infinity
+	 * @default 25
 	 */
 	maxDistance: number
 
@@ -130,7 +130,7 @@ export interface WithRectOverrideOption {
 
 export const defaultRelativeOptions: GetClosestElementOptions = {
 	outerOffset: 0,
-	maxDistance: Infinity,
+	maxDistance: 25,
 	dig: {count: 1, step: 20, untilOffscreen: false},
 	debug: false,
 }
