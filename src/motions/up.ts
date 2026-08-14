@@ -91,6 +91,7 @@ export function up(
 			fastTravelChecks = [...fastTravelChecks, options.fastTravel.fallback]
 		}
 	}
+	console.log(fastTravelChecks)
 
 	let currIndex: number
 	if (highlightIndexStart !== highlightIndexEnd) {
