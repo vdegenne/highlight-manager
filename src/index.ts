@@ -261,6 +261,18 @@ export class HighlightManager<T = {}> {
 		return {...base, ...extra}
 	}
 
+	get isFullHighlighted() {
+		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
+			internal: true,
+		})
+
+		return (
+			elements.length > 0 &&
+			highlightIndexStart === 0 &&
+			highlightIndexEnd === elements.length - 1
+		)
+	}
+
 	unhighlightAll(elements?: HTMLElement[]) {
 		if (!elements) {
 			elements = this.getInfo({internal: true}).elements
