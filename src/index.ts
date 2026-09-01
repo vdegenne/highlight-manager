@@ -261,7 +261,7 @@ export class HighlightManager<T = {}> {
 		return {...base, ...extra}
 	}
 
-	get isFullHighlighted() {
+	get isFullyHighlighted() {
 		const {elements, highlightIndexStart, highlightIndexEnd} = this.getInfo({
 			internal: true,
 		})
