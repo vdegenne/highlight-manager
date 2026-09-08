@@ -92,7 +92,7 @@ export class HighlightManager<T = {}> {
 					}),
 			...(!options ||
 			!('fastTravel' in options) /* && options.fastTravel === false*/
-				? {fastTravel: undefined}
+				? {fastTravel: fastTravelDefaults}
 				: {
 						fastTravel: {
 							...fastTravelDefaults,
